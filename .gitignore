@@ -1,4 +1,6 @@
 build/
+CMakeUserPresets.json
+*.o
 *.elf
 *.bin
 *.hex

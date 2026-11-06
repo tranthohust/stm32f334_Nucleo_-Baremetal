@@ -36,6 +36,14 @@
 #define CAN1_BASEADDR (APB1PERIPH_BASEADDR + 0x6400)
 
 //define structure of GPIO
+//define nvic register structure
+#define NVIC_ISER0 ((volatile uint32_t*)0xE000E100)
+#define NVIC_ISER1 ((volatile uint32_t*)0xE000E104)
+#define NVIC_ISER2 ((volatile uint32_t*)0xE000E108)
+#define NVIC_ICER0 ((volatile uint32_t*)0xE000E180)
+#define NVIC_ICER1 ((volatile uint32_t*)0xE000E184)
+#define NVIC_ICER2 ((volatile uint32_t*)0xE000E188)
+#define NVIC_BASEADDR ((volatile uint32_t *)0xE000E100)
 typedef struct
 {
     volatile uint32_t MODER;
@@ -178,7 +186,6 @@ typedef struct
         volatile uint32_t AWD3CR;
         volatile uint32_t DIFSEL;
         volatile uint32_t CALFACT;
-        volatile uint32_t CCR;
         volatile uint32_t CCR;
         volatile uint32_t CDR;
     }ADC_RegDef_t;

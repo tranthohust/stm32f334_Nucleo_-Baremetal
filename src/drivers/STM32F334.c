@@ -1,7 +1,8 @@
 #include "STM32F334_GPIO.h"
+#define NO_PR_BITS_IMPLEMENTED 4U
 
 void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, uint8_t EnorDi){
-    if(EnorDi = ENABLE){
+    if(EnorDi == ENABLE){
         if(pGPIOx == GPIOA){
             GPIOA_PCLK_EN();
         }else if(pGPIOx == GPIOB){
@@ -61,6 +62,12 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle){
             EXIT ->RTSR1 |= (1 << pGPIOHandle -> GPIO_PinConfig.GPIO_PinNumber);
             EXIT ->FTSR1 |= (1 << pGPIOHandle -> GPIO_PinConfig.GPIO_PinNumber);
         }
+        uint8_t temp1 = pGPIOHandle -> GPIO_PinConfig.GPIO_PinNumber / 4;
+        uint8_t temp2 = pGPIOHandle -> GPIO_PinConfig.GPIO_PinNumber % 4;
+        uint8_t portcode = GPIO_BASEADDR_TO_CODE(pGPIOHandle -> pGPIOx);
+        SYSCFG_PCLK_EN();
+        SYSCFG ->EXTICR[temp1] &= ~(0xF << (temp2 * 4));
+        SYSCFG ->EXTICR[temp1] |= (portcode << (temp2 * 4));
     }
     //2. Configure the speed
     temp = (pGPIOHandle-> GPIO_PinConfig.GPIO_PinSpeed << (2 * pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber));
@@ -72,7 +79,7 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle){
     pGPIOHandle -> pGPIOx ->PUPDR |= temp;
     //4. Configure the output type
     temp  = (pGPIOHandle -> GPIO_PinConfig.GPIO_PinOPType << pGPIOHandle -> GPIO_PinConfig.GPIO_PinNumber);
-    pGPIOHandle ->pGPIOx -> OTYPER  &= ~(0x1) << pGPIOHandle ->GPIO_PinConfig.GPIO_PinNumber;
+    pGPIOHandle ->pGPIOx -> OTYPER  &= ~(1U << pGPIOHandle ->GPIO_PinConfig.GPIO_PinNumber);
     pGPIOHandle -> pGPIOx ->OTYPER |= temp;
     //5. Configure the alternate functionality
     if(pGPIOHandle ->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_ALTFN)
@@ -104,9 +111,9 @@ void GPIO_DeInit(GPIO_RegDef_t *pGPIOx){
 }
 uint8_t GPIO_ReadFromInputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber)
 {
-    uint8_t value;
     //dich phai de lay gia tri cua pin tu thanh ghi IDR
-    uint8_t value = (uint8_t)((pGPIOx->IDR >> PinNumber) & 0x00000001);
+    uint8_t value = (uint8_t)((pGPIOx->IDR >> PinNumber) & 1U);
+    return value;
 }
 uint16_t GPIO_ReadFromInputPort(GPIO_RegDef_t *pGPIOx){
     uint16_t value = (uint16_t)pGPIOx->IDR;
@@ -127,5 +134,42 @@ void GPIO_WriteToOutputPort(GPIO_RegDef_t *pGPIOx, uint16_t Value){
 void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber){
     pGPIOx ->ODR ^= (1 << PinNumber);
 }
-void GPIO_IRQConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t EnorDi);
-void GPIO_IRQHandling(uint8_t PinNumber);
+void GPIO_IRQConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t EnorDi){
+    
+    if(EnorDi == ENABLE){
+        if(IRQNumber <= 31){
+            //program ISER0 register
+            *NVIC_ISER0 |= (1 << IRQNumber);
+        }else if(IRQNumber > 31 && IRQNumber < 64){
+            //program ISER1 register
+            *NVIC_ISER1 |= (1 << (IRQNumber % 32));
+        }else if(IRQNumber >= 64 && IRQNumber < 96){
+            //program ISER2 register
+            *NVIC_ISER2 |= (1 << (IRQNumber % 64));
+        }
+    }else{
+        if(IRQNumber <= 31){
+            //program ICER0 register
+            *NVIC_ICER0 |= (1 << IRQNumber);
+        }else if(IRQNumber > 31 && IRQNumber < 64){
+            //program ICER1 register
+            *NVIC_ICER1 |= (1 << (IRQNumber % 32));
+        }else if(IRQNumber >= 64 && IRQNumber < 96){
+            //program ICER2 register
+            *NVIC_ICER2 |= (1 << (IRQNumber % 64));
+        }
+    }
+}
+void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority){
+    //1. first lets find out the ipr register
+    uint8_t iprx = IRQNumber / 4;
+    uint8_t iprx_section = IRQNumber % 4;
+    uint8_t shift_amount = (8 * iprx_section) + (8 - NO_PR_BITS_IMPLEMENTED);
+    *(NVIC_BASEADDR + iprx) |= (IRQPriority << shift_amount);
+}
+void GPIO_IRQHandling(uint8_t PinNumber){
+    if(EXIT ->PR1 & (1 << PinNumber)){
+        //clear the pending register
+        EXIT ->PR1 |= (1 << PinNumber);
+    }
+};
