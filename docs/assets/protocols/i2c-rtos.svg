@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="1120" viewBox="0 0 940 1120" role="img" aria-labelledby="i2c-rtos-title">
+<title id="i2c-rtos-title">Đọc I2C trong RTOS: ai làm gì, theo thứ tự nào?</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đọc I2C trong RTOS: ai làm gì, theo thứ tự nào?</text>
+<rect x="160" y="80" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">1. COMM TASK</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận lệnh I2C READ</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Queue copy address + register</text>
+<rect x="160" y="222" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="246" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">2. I2C WORKER</text>
+<text x="470.0" y="274" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận request; giữ TX/RX buffer</text>
+<text x="470.0" y="297" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C_Submit rồi I2C_Process</text>
+<polyline points="470,176 470,222" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,222 466.0853101929989,213.8959760788259 473.9146898070011,213.8959760788259" fill="#64748b"/>
+<rect x="160" y="364" width="620" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="388" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">3. DRIVER → HARDWARE</text>
+<text x="470.0" y="416" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đặt CR2, gửi START và byte register</text>
+<text x="470.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ngoại vi tạo tín hiệu trên SCL / SDA</text>
+<polyline points="470,318 470,364" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,364 466.0853101929989,355.8959760788259 473.9146898070011,355.8959760788259" fill="#64748b"/>
+<rect x="160" y="506" width="620" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="530" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">4. I2C EV / ER ISR</text>
+<text x="470.0" y="558" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Driver chuyển byte và cập nhật trạng thái</text>
+<text x="470.0" y="581" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhả critical section rồi notify Worker</text>
+<polyline points="470,460 470,506" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,506 466.0853101929989,497.8959760788259 473.9146898070011,497.8959760788259" fill="#64748b"/>
+<rect x="160" y="648" width="620" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="672" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">5. I2C WORKER THỨC DẬY</text>
+<text x="470.0" y="700" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C_Process kiểm tra state hoặc timeout</text>
+<text x="470.0" y="723" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Callback báo kết quả trong Worker</text>
+<polyline points="470,602 470,648" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,648 466.0853101929989,639.8959760788259 473.9146898070011,639.8959760788259" fill="#64748b"/>
+<rect x="160" y="790" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="814" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">6. RESPONSE QUEUE</text>
+<text x="470.0" y="842" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Copy status và byte nhận được</text>
+<text x="470.0" y="865" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Worker không tự in UART</text>
+<polyline points="470,744 470,790" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,790 466.0853101929989,781.8959760788259 473.9146898070011,781.8959760788259" fill="#64748b"/>
+<rect x="160" y="932" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="956" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">7. COMM TASK</text>
+<text x="470.0" y="984" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận response, hiểu kết quả</text>
+<text x="470.0" y="1007" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Gửi thông báo qua driver UART</text>
+<polyline points="470,886 470,932" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,932 466.0853101929989,923.8959760788259 473.9146898070011,923.8959760788259" fill="#64748b"/>
+<text x="470" y="1062" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Notification là lời nhắc kiểm tra trạng thái, không phải packet dữ liệu.</text>
+</svg>

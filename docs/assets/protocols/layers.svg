@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="945" viewBox="0 0 940 945" role="img" aria-labelledby="layers-title">
+<title id="layers-title">Từ yêu cầu ứng dụng tới tín hiệu trên dây</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Từ yêu cầu ứng dụng tới tín hiệu trên dây</text>
+<rect x="38" y="82" width="554" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="315.0" y="106" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">1. APPLICATION</text>
+<text x="315.0" y="134" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Hiểu lệnh và ý nghĩa dữ liệu</text>
+<text x="315.0" y="157" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ví dụ: LED ON, đọc giá trị cảm biến</text>
+<rect x="38" y="214" width="554" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="315.0" y="238" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">2. SERVICE / PROTOCOL</text>
+<text x="315.0" y="266" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ghép byte thành lệnh hoặc gói</text>
+<text x="315.0" y="289" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Parser, request và response</text>
+<polyline points="315,178 315,214" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,214 311.0853101929989,205.8959760788259 318.9146898070011,205.8959760788259" fill="#64748b"/>
+<rect x="38" y="346" width="554" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="315.0" y="370" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">3. DRIVER</text>
+<text x="315.0" y="398" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Quản lý handle, buffer và trạng thái</text>
+<text x="315.0" y="421" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">UART / SPI / I2C / CAN</text>
+<polyline points="315,310 315,346" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,346 311.0853101929989,337.8959760788259 318.9146898070011,337.8959760788259" fill="#64748b"/>
+<rect x="38" y="478" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="502" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">4. THANH GHI</text>
+<text x="315.0" y="530" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Driver ghi cấu hình và data register</text>
+<text x="315.0" y="553" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CR, ISR/SR, TDR/RDR, DMA</text>
+<polyline points="315,442 315,478" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,478 311.0853101929989,469.8959760788259 318.9146898070011,469.8959760788259" fill="#64748b"/>
+<rect x="38" y="610" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="634" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">5. NGOẠI VI TRONG MCU</text>
+<text x="315.0" y="662" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Phần cứng tự tạo clock, dịch bit, nhận byte</text>
+<text x="315.0" y="685" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">USART2 / SPI1 / I2C1 / bxCAN</text>
+<polyline points="315,574 315,610" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,610 311.0853101929989,601.8959760788259 318.9146898070011,601.8959760788259" fill="#64748b"/>
+<rect x="38" y="742" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="766" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">6. CHÂN VÀ MẠCH NGOÀI</text>
+<text x="315.0" y="794" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO alternate function nối ngoại vi ra chân</text>
+<text x="315.0" y="817" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Dây, thiết bị, pull-up hoặc transceiver</text>
+<polyline points="315,706 315,742" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,742 311.0853101929989,733.8959760788259 318.9146898070011,733.8959760788259" fill="#64748b"/>
+<rect x="640" y="82" width="260" height="96" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="770.0" y="106" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#64748b">BOARD CONFIG</text>
+<text x="770.0" y="134" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chọn chân, AF, clock</text>
+<text x="770.0" y="157" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO_Init trước Init</text>
+<polyline points="770,178 770,366 592,366" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="592,366 600.1040239211741,362.0853101929989 600.1040239211741,369.9146898070011" fill="#64748b"/>
+<text x="836" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Cấu hình</text>
+<rect x="640" y="500" width="260" height="96" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="770.0" y="524" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#64748b">IRQ / NVIC</text>
+<text x="770.0" y="552" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Báo có byte hoặc lỗi</text>
+<text x="770.0" y="575" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR cập nhật driver</text>
+<polyline points="592,658 770,658 770,596" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="770,596 773.9146898070011,604.1040239211741 766.0853101929989,604.1040239211741" fill="#64748b"/>
+<text x="751" y="682" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Sự kiện</text>
+<polyline points="770,500 770,420 592,420" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="592,420 600.1040239211741,416.0853101929989 600.1040239211741,423.9146898070011" fill="#64748b"/>
+<text x="856" y="464" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Byte / trạng thái</text>
+<text x="470" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đọc từ trên xuống. Kết quả được driver trả lên qua Read, callback hoặc TX result.</text>
+</svg>

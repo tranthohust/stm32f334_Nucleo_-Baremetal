@@ -1,0 +1,1861 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Học kiến trúc giao thức STM32F334</title><style>
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #f3f5f8; color: #203046; font: 17px/1.8 'Segoe UI',Arial,sans-serif; }
+main { max-width: 1080px; margin: 28px auto; padding: 44px 56px; background: white; }
+h1 { font-size: 32px; line-height: 1.35; color: #10263d; }
+h2 { margin-top: 64px; padding-top: 12px; border-top: 2px solid #e5edf5; font-size: 25px; line-height: 1.4; }
+h3 { margin-top: 34px; font-size: 20px; color: #155e75; }
+a { color: #145bc4; text-underline-offset: 3px; }
+code { font: .9em/1.65 Consolas,monospace; background: #eef3f8; padding: 2px 5px; border-radius: 3px; }
+pre { white-space: pre; overflow: auto; padding: 20px; background: #eef3f8; }
+pre code { padding: 0; background: none; }
+table { border-collapse: collapse; width: 100%; margin: 22px 0; font-size: 15px; }
+th,td { padding: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #dce4ed; overflow-wrap: anywhere; }
+th { background: #edf3fa; }
+figure { margin: 28px 0; }
+.diagram { overflow-x: auto; background: white; }
+.diagram svg { width: 100%; min-width: 700px; height: auto; display: block; }
+figcaption { text-align: center; font-size: 14px; color: #53677c; }
+.reading-note { padding: 16px 20px; background: #edf6ff; border-left: 4px solid #2563eb; }
+.back { position: sticky; bottom: 18px; display: block; width: max-content; margin-left: auto; background: white; padding: 6px 12px; border: 1px solid #dce4ed; }
+@media(max-width:760px) { body { font-size: 16px; } main { margin: 0; padding: 22px 18px; } h1 { font-size: 27px; } table { display: block; overflow-x: auto; } th,td { min-width: 145px; } }
+@media print { body { background: white; font-size: 11pt; } main { margin: 0; max-width: none; padding: 0; } .back,.reading-note { display:none; } .diagram svg { min-width: 0; max-height: 245mm; } figure, tr { break-inside: avoid; } }
+</style></head><body><main id="top"><p class="reading-note">Bản đọc trực tiếp: sơ đồ đã vẽ sẵn. Dùng mục lục để chọn phần; không cần tiện ích hay kết nối mạng.</p><h1>Kiến trúc giao thức và ngoại vi: application → driver → hardware</h1>
+<p><strong>Bản đọc bằng trình duyệt:</strong> <a href="#top">Mở tài liệu có sơ đồ và bảng đã hiển thị sẵn</a>.
+Mở file HTML bằng trình duyệt; toàn bộ hình được nhúng sẵn và dùng được offline.</p>
+<p>Tài liệu học tổng hợp cho chính project STM32F334R8 này. Mỗi phần trả lời bốn
+câu hỏi: <strong>cấu trúc gồm gì, mỗi phần làm gì, vì sao cần nó, và code nào nối các phần lại</strong>.
+Các đường gọi mô tả implementation hiện tại; các tính năng chưa viết được ghi rõ.</p>
+<p>UART, SPI, I2C và CAN là giao tiếp. Timer đếm thời gian; PWM tạo xung; ADC đổi
+điện áp thành số. GPIO cấu hình chân vật lý; DMA chuyển dữ liệu;
+NVIC phân phối ngắt; FreeRTOS lập lịch task và đồng bộ. Chúng phối hợp để chạy
+giao tiếp, nhưng có trách nhiệm khác nhau.</p>
+<h2>Mục lục</h2>
+<ol>
+<li><a href="#layers">Bức tranh application → driver → hardware</a></li>
+<li><a href="#startup">Cấu trúc thư mục và đường khởi động</a></li>
+<li><a href="#structures">Ý nghĩa Config, Handle, Register, Transaction và Callback</a></li>
+<li><a href="#comparison">So sánh giao thức và chân đang dùng</a></li>
+<li><a href="#gpio">GPIO: cầu nối tới chân vật lý</a></li>
+<li><a href="#uart">UART: byte stream, ngắt, DMA và buffer</a></li>
+<li><a href="#spi">SPI: transaction đồng thời gửi/nhận</a></li>
+<li><a href="#i2c">I2C: địa chỉ, ACK/NACK và repeated START</a></li>
+<li><a href="#can">CAN: frame, filter, FIFO và mailbox</a></li>
+<li><a href="#rtos">FreeRTOS đặt ở đâu trong kiến trúc?</a></li>
+<li><a href="#walkthrough">Lần theo các lệnh thực tế</a></li>
+<li><a href="#review">Rà soát, kiểm chứng và cách debug</a></li>
+<li><a href="#practice">Lộ trình thực hành và tài liệu gốc</a></li>
+<li><a href="#gpio-input">GPIO input, EXTI và debounce nút nhấn</a></li>
+<li><a href="#timer">Timer: clock, bộ đếm, update và callback</a></li>
+<li><a href="#pwm">PWM: chu kỳ, duty và chân output</a></li>
+<li><a href="#adc">ADC: lấy mẫu điện áp và liên kết ADC → PWM</a></li>
+</ol>
+<p><a id="layers"></a></p>
+<h2>1. Bức tranh application → driver → hardware</h2>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="945" viewBox="0 0 940 945" role="img" aria-labelledby="layers-title">
+<title id="layers-title">Từ yêu cầu ứng dụng tới tín hiệu trên dây</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Từ yêu cầu ứng dụng tới tín hiệu trên dây</text>
+<rect x="38" y="82" width="554" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="315.0" y="106" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">1. APPLICATION</text>
+<text x="315.0" y="134" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Hiểu lệnh và ý nghĩa dữ liệu</text>
+<text x="315.0" y="157" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ví dụ: LED ON, đọc giá trị cảm biến</text>
+<rect x="38" y="214" width="554" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="315.0" y="238" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">2. SERVICE / PROTOCOL</text>
+<text x="315.0" y="266" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ghép byte thành lệnh hoặc gói</text>
+<text x="315.0" y="289" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Parser, request và response</text>
+<polyline points="315,178 315,214" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,214 311.0853101929989,205.8959760788259 318.9146898070011,205.8959760788259" fill="#64748b"/>
+<rect x="38" y="346" width="554" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="315.0" y="370" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">3. DRIVER</text>
+<text x="315.0" y="398" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Quản lý handle, buffer và trạng thái</text>
+<text x="315.0" y="421" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">UART / SPI / I2C / CAN</text>
+<polyline points="315,310 315,346" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,346 311.0853101929989,337.8959760788259 318.9146898070011,337.8959760788259" fill="#64748b"/>
+<rect x="38" y="478" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="502" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">4. THANH GHI</text>
+<text x="315.0" y="530" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Driver ghi cấu hình và data register</text>
+<text x="315.0" y="553" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CR, ISR/SR, TDR/RDR, DMA</text>
+<polyline points="315,442 315,478" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,478 311.0853101929989,469.8959760788259 318.9146898070011,469.8959760788259" fill="#64748b"/>
+<rect x="38" y="610" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="634" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">5. NGOẠI VI TRONG MCU</text>
+<text x="315.0" y="662" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Phần cứng tự tạo clock, dịch bit, nhận byte</text>
+<text x="315.0" y="685" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">USART2 / SPI1 / I2C1 / bxCAN</text>
+<polyline points="315,574 315,610" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,610 311.0853101929989,601.8959760788259 318.9146898070011,601.8959760788259" fill="#64748b"/>
+<rect x="38" y="742" width="554" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="315.0" y="766" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">6. CHÂN VÀ MẠCH NGOÀI</text>
+<text x="315.0" y="794" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO alternate function nối ngoại vi ra chân</text>
+<text x="315.0" y="817" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Dây, thiết bị, pull-up hoặc transceiver</text>
+<polyline points="315,706 315,742" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="315,742 311.0853101929989,733.8959760788259 318.9146898070011,733.8959760788259" fill="#64748b"/>
+<rect x="640" y="82" width="260" height="96" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="770.0" y="106" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#64748b">BOARD CONFIG</text>
+<text x="770.0" y="134" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chọn chân, AF, clock</text>
+<text x="770.0" y="157" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO_Init trước Init</text>
+<polyline points="770,178 770,366 592,366" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="592,366 600.1040239211741,362.0853101929989 600.1040239211741,369.9146898070011" fill="#64748b"/>
+<text x="836" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Cấu hình</text>
+<rect x="640" y="500" width="260" height="96" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="770.0" y="524" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#64748b">IRQ / NVIC</text>
+<text x="770.0" y="552" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Báo có byte hoặc lỗi</text>
+<text x="770.0" y="575" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR cập nhật driver</text>
+<polyline points="592,658 770,658 770,596" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="770,596 773.9146898070011,604.1040239211741 766.0853101929989,604.1040239211741" fill="#64748b"/>
+<text x="751" y="682" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Sự kiện</text>
+<polyline points="770,500 770,420 592,420" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="592,420 600.1040239211741,416.0853101929989 600.1040239211741,423.9146898070011" fill="#64748b"/>
+<text x="856" y="464" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">Byte / trạng thái</text>
+<text x="470" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đọc từ trên xuống. Kết quả được driver trả lên qua Read, callback hoặc TX result.</text>
+</svg></div><figcaption>Sơ đồ các lớp từ application tới phần cứng</figcaption></figure>
+
+<p>Đọc theo thứ tự: <strong>ứng dụng yêu cầu → driver điều khiển → thanh ghi được ghi →
+ngoại vi làm việc → tín hiệu ra chân</strong>. Khi nhận được dữ liệu hoặc có lỗi,
+ngắt cập nhật driver; ứng dụng lấy kết quả bằng Read, callback hoặc TX result.</p>
+<p>Ví dụ ứng dụng muốn đọc nhiệt độ. Driver I2C chỉ biết địa chỉ và dãy byte cần
+gửi/nhận; ứng dụng phải biết register nào chứa nhiệt độ và cách đổi byte thành °C.
+Vì thế một bus hoạt động đúng chưa chứng minh ứng dụng giải mã đúng dữ liệu.</p>
+<ol>
+<li>
+<p><strong>Application – quyết định việc cần làm.</strong> Nhận lệnh như <code>LED ON</code> hoặc
+   <code>I2C READ</code>, hiểu dữ liệu nhận được và quyết định phản hồi.
+   Xem <a href="../src/app/communication_demo.c">communication_demo.c</a>.</p>
+</li>
+<li>
+<p><strong>Service – biến dữ liệu thô thành thông điệp.</strong> Parser ghép byte thành
+   một dòng lệnh; request/response chuyển công việc giữa các task.
+   Xem <a href="../src/services/line_parser.c">line_parser.c</a> và <a href="../src/rtos/rtos_demo.c">rtos_demo.c</a>.</p>
+</li>
+<li>
+<p><strong>Driver – thực hiện yêu cầu giao tiếp.</strong> Giữ handle, buffer, queue và tiến độ;
+   cung cấp Init, Read/Write, Submit, Process và IRQHandling.
+   Xem <a href="../src/drivers">thư mục drivers</a>.</p>
+</li>
+<li>
+<p><strong>Register map – tên C của thanh ghi phần cứng.</strong> Các cấu trúc như
+   <code>USART_RegDef_t</code> giúp driver đọc/ghi đúng địa chỉ.
+   Xem <a href="../src/drivers/STM32F334.h">STM32F334.h</a>.</p>
+</li>
+<li>
+<p><strong>Hardware – phần cứng thật thực hiện truyền nhận.</strong> Ngoại vi dịch bit,
+   tạo clock, nhận dữ liệu; GPIO AF nối ngoại vi tới chân và mạch ngoài.
+   Đối chiếu <a href="https://www.st.com/resource/en/reference_manual/rm0364-stm32f334xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">ST RM0364</a>.</p>
+</li>
+<li>
+<p><strong>Board – chọn cấu hình đúng với bo mạch.</strong> Ví dụ PA2/PA3 cho UART,
+   PB8/PB9 open-drain cho I2C. Board gọi GPIO_Init và cấu hình handle ngoại vi.
+   Xem <a href="../src/app/board_peripherals.c">board_peripherals.c</a>.</p>
+</li>
+<li>
+<p><strong>Core – quản lý ngắt và thời gian.</strong> NVIC chọn ISR cần chạy, critical section
+   bảo vệ trạng thái dùng chung, SysTick tạo mốc millisecond.
+   Xem <a href="../src/drivers/STM32F334_CORE.c">STM32F334_CORE.c</a>.</p>
+</li>
+</ol>
+<h3>Ba luồng phải phân biệt</h3>
+<p><strong>Luồng điều khiển:</strong> application gọi API → driver sửa thanh ghi → ngoại vi bắt
+đầu công việc. Giá trị trả về có thể chỉ báo công việc đã vào queue.</p>
+<p><strong>Luồng dữ liệu:</strong> byte/frame từ dây → ngoại vi → RAM → parser/dispatcher →
+application. Khi gửi thì đi ngược lại. Với DMA, dữ liệu đi giữa ngoại vi và RAM
+qua DMA controller; CPU không phải copy từng byte từ data register.</p>
+<p><strong>Luồng thực thi:</strong> CPU chạy main hoặc một task. Khi có ngắt, CPU chạy ISR rồi
+trở lại công việc trước đó hoặc chuyển task. Một API nhận dữ liệu bất đồng bộ
+có thể return trước khi dữ liệu tới; state và buffer nối hai thời điểm này.</p>
+<p><a id="startup"></a></p>
+<h2>2. Cấu trúc thư mục và đường khởi động</h2>
+<pre><code class="language-text">src/
+  startup/     vector table, Reset_Handler
+  systerm/     SystemInit, khởi tạo constructor, memory helpers
+  test/        main: chọn vòng lặp bare-metal hoặc FreeRTOS
+  app/         pin map, handle, command, ISR chuyển tiếp
+  services/    line parser độc lập phần cứng
+  drivers/     register definitions, GPIO, core, UART/SPI/I2C/CAN
+  rtos/        FreeRTOSConfig, task/queue/mutex, fault hooks
+third_party/FreeRTOS-Kernel/  kernel và port chính thức đã ghim phiên bản
+tests/         kiểm thử trên PC bằng register mock
+</code></pre>
+<p>Sau reset, <a href="../src/startup/startup_stm32f334x8.s">startup_stm32f334x8.s</a> đặt MSP,
+gọi <code>SystemInit</code>, copy <code>.data</code>, xóa <code>.bss</code>, chạy constructor rồi gọi <code>main</code>.
+<code>SystemInit</code> hiện giữ clock HSI reset và đặt VTOR cho vector trong Flash.
+<a href="../STM32F334R8_FLASH.ld">Linker script</a> đặt code trong 64 KB Flash và dữ liệu
+trong 12 KB SRAM thường; chừa ít nhất 1 KB cho stack MSP.</p>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="690" viewBox="0 0 940 690" role="img" aria-labelledby="startup-title">
+<title id="startup-title">Cùng phần cứng, hai cách tổ chức chương trình</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Cùng phần cứng, hai cách tổ chức chương trình</text>
+<rect x="260" y="70" width="420" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">RESET → MAIN</text>
+<text x="470.0" y="122" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Khởi tạo RAM và timebase 1 ms</text>
+<polyline points="470,166 470,204 232,204 232,240" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="232,240 228.08531019299892,231.8959760788259 235.91468980700108,231.8959760788259" fill="#64748b"/>
+<polyline points="470,204 710,204 710,240" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="710,240 706.0853101929989,231.8959760788259 713.9146898070011,231.8959760788259" fill="#64748b"/>
+<rect x="32" y="240" width="400" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="232.0" y="264" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">BARE-METAL</text>
+<text x="232.0" y="292" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CommunicationDemo_Init</text>
+<text x="232.0" y="315" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Một vòng lặp main gọi các Process</text>
+<rect x="510" y="240" width="400" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="710.0" y="264" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">FREERTOS</text>
+<text x="710.0" y="292" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Tạo task, queue và mutex tĩnh</text>
+<text x="710.0" y="315" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">vTaskStartScheduler</text>
+<polyline points="232,336 232,390" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="232,390 228.08531019299892,381.8959760788259 235.91468980700108,381.8959760788259" fill="#64748b"/>
+<rect x="32" y="390" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="232.0" y="414" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">MAIN SỞ HỮU CÁC DRIVER</text>
+<text x="232.0" y="442" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Luân phiên UART / SPI / I2C / CAN</text>
+<text x="232.0" y="465" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Callback chạy trong main</text>
+<polyline points="710,336 710,390" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="710,390 706.0853101929989,381.8959760788259 713.9146898070011,381.8959760788259" fill="#64748b"/>
+<rect x="510" y="390" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="710.0" y="414" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">TASK CÓ QUYỀN SỞ HỮU</text>
+<text x="710.0" y="442" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Comm: UART / SPI / CAN</text>
+<text x="710.0" y="465" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2CWorker: I2C; Producer: gửi request</text>
+<text x="470" y="553" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Driver và thanh ghi không đổi theo cách lập lịch.</text>
+<text x="470" y="592" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Bare-metal nhường bằng cách return. Task nhường bằng delay hoặc chờ sự kiện.</text>
+</svg></div><figcaption>Khởi động bare-metal và FreeRTOS</figcaption></figure>
+
+<p><code>Board_*Init</code> dùng GPIO API bạn đã viết, điền <code>pXXXx</code> và <code>XXX_Config</code>, rồi gọi
+driver Init. Ví dụ <code>Board_UARTInit</code> chọn PA2/PA3 AF7; <code>UART_Init</code> cấu hình USART2
+và DMA/NVIC. Chỉ đặt GPIO AF mà chưa Init ngoại vi thì chưa truyền được byte.</p>
+<p><a id="structures"></a></p>
+<h2>3. Ý nghĩa Config, Handle, Register, Transaction và Callback</h2>
+<table>
+<thead>
+<tr>
+<th>Cấu trúc/khái niệm</th>
+<th>Chứa gì?</th>
+<th>Vì sao cần?</th>
+<th>Ví dụ thực tế</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>XXX_Config_t</code></td>
+<td>Tham số cấu hình</td>
+<td>Biến ý định người dùng thành giá trị thanh ghi</td>
+<td><code>UART_BaudRate</code>, <code>SPI_CPOL</code>, <code>I2C_Timing</code>, <code>CAN_BitRate</code></td>
+</tr>
+<tr>
+<td><code>XXX_Handle_t</code></td>
+<td>Con trỏ ngoại vi + Config + runtime</td>
+<td>Giữ trạng thái qua nhiều lần gọi và nhiều ISR</td>
+<td><code>huart2</code>, <code>hspi1</code>, <code>hi2c1</code>, <code>hcan1</code></td>
+</tr>
+<tr>
+<td><code>XXX_RegDef_t</code></td>
+<td>Các trường <code>volatile</code> theo offset</td>
+<td>Gắn tên C với địa chỉ phần cứng</td>
+<td><code>huart2.pUSARTx-&gt;BRR</code></td>
+</tr>
+<tr>
+<td>Transaction</td>
+<td>Yêu cầu một lần truyền/nhận</td>
+<td>Tách việc Submit khỏi lúc bus thật sự chạy</td>
+<td><code>SPI_Transaction</code>, <code>I2C_Transaction</code></td>
+</tr>
+<tr>
+<td>Frame</td>
+<td>Một thông điệp đã có biên phần cứng</td>
+<td>Lưu đầy đủ ID, loại frame, DLC, payload</td>
+<td><code>CAN_Frame</code></td>
+</tr>
+<tr>
+<td>Ring buffer</td>
+<td>Mảng byte + head/tail</td>
+<td>Hấp thụ tốc độ đến khác tốc độ xử lý</td>
+<td>UART RX/TX</td>
+</tr>
+<tr>
+<td>Queue</td>
+<td>Các item có kiểu xác định</td>
+<td>Giữ thứ tự công việc hoặc chuyển dữ liệu giữa task</td>
+<td>SPI transaction queue, CAN frame queue, RTOS request queue</td>
+</tr>
+<tr>
+<td>State machine</td>
+<td>Trạng thái hiện tại + chuyển trạng thái</td>
+<td>Không phải chờ chặn tới khi xong một transfer</td>
+<td>SPI <code>TRANSFER → WAIT_END</code>; I2C <code>WAIT_BUS → TX → RX</code></td>
+</tr>
+<tr>
+<td>Callback</td>
+<td>Hàm được gọi sau khi có kết quả</td>
+<td>Báo hoàn tất về application</td>
+<td><code>spi_complete</code>, <code>i2c_complete</code></td>
+</tr>
+<tr>
+<td>Stats/epoch</td>
+<td>Counter và dấu mất liên tục</td>
+<td>Quan sát quá tải/lỗi và đồng bộ lại parser</td>
+<td>UART <code>rx_epoch</code>, I2C <code>nacks</code>, CAN <code>tx_failed</code></td>
+</tr>
+</tbody>
+</table>
+<h3>Từ con trỏ C tới địa chỉ thật</h3>
+<p>Trong header, <code>USART2</code> là con trỏ tới base <code>0x40004400</code>. <code>TDR</code> nằm ở offset
+<code>0x28</code>; vì vậy <code>huart2.pUSARTx-&gt;TDR</code> trỏ tới <code>0x40004428</code> khi handle chọn USART2.
+Driver ghi địa chỉ đó vào DMA CPAR; DMA đọc TX ring ở CMAR và chuyển byte tới TDR.
+Khối USART sau đó tự dịch bit ra PA2. Application không phải tự bật/tắt PA2 cho
+từng bit UART.</p>
+<p><code>volatile</code> yêu cầu compiler thực hiện truy cập thanh ghi/bộ nhớ dùng chung cần
+thiết. Nó không tạo mutex, không giữ một nhóm thao tác nguyên tử và không làm
+API tự an toàn khi nhiều task cùng dùng. Driver vẫn cần critical section, còn
+application vẫn cần quy định task nào sở hữu handle.</p>
+<h3>Vòng đời và quyền sở hữu</h3>
+<pre><code class="language-text">Handle global/static được zero-init
+    → gán pXXXx và Config
+    → Board cấu hình GPIO
+    → XXX_Init(&amp;handle)
+    → Submit/Read/Write + Process; ISR gọi IRQHandling cùng handle
+    → XXX_DeInit(&amp;handle) thành công
+    → được đổi Config hoặc chuyển handle sở hữu
+</code></pre>
+<p>Driver hiện chỉ hỗ trợ <strong>USART2, SPI1 master 8-bit, I2C1 master 7-bit và CAN1</strong>.
+Tên API theo form HAL của project; header có thêm địa chỉ ngoại vi không đồng
+nghĩa driver đã triển khai tất cả instance/chế độ đó.</p>
+<p>UART Write copy byte vào TX ring nên input có thể tái sử dụng ngay. CAN Send
+copy nguyên frame. SPI/I2C Submit chỉ copy descriptor: TX/RX/context phải còn
+sống, không bị caller sửa tới callback. Không dùng lại cùng buffer cho hai
+transfer đang chờ nếu chưa xác định rõ quyền sở hữu.</p>
+<p>UART DeInit chủ động hủy dữ liệu đang chờ. SPI/I2C DeInit từ chối khi đang có
+transaction hoặc callback; CAN DeInit từ chối TX active/queued và bỏ RX/result
+chưa đọc khi thành công. Luôn kiểm tra kết quả Init/DeInit/Submit.</p>
+<p><a id="comparison"></a></p>
+<h2>4. So sánh giao thức và chân đang dùng</h2>
+<table>
+<thead>
+<tr>
+<th>Giao tiếp</th>
+<th>Cấu trúc dữ liệu trên dây</th>
+<th>Clock/đồng bộ</th>
+<th>Chọn đối tượng giao tiếp</th>
+<th>Đơn vị phần mềm hiện tại</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UART</td>
+<td>Start, data, stop; demo 8N1</td>
+<td>Hai bên cùng baud, không có dây clock</td>
+<td>Đường TX/RX đã nối</td>
+<td>Byte stream; parser dòng ở application</td>
+</tr>
+<tr>
+<td>SPI</td>
+<td>Bit TX/RX theo từng xung SCK</td>
+<td>Master phát SCK; CPOL/CPHA</td>
+<td>CS riêng của thiết bị</td>
+<td>Transaction full-duplex</td>
+</tr>
+<tr>
+<td>I2C</td>
+<td>START, address+R/W, data, ACK/NACK, STOP</td>
+<td>SCL; thiết bị có thể stretch clock</td>
+<td>Địa chỉ 7-bit trong bài</td>
+<td>TX/RX hoặc write-read repeated START</td>
+</tr>
+<tr>
+<td>CAN</td>
+<td>Frame có ID, control, data, CRC/ACK, kết thúc</td>
+<td>Các node đồng bộ theo bit timing</td>
+<td>Broadcast theo ID; filter chọn frame nhận</td>
+<td>Frame hoàn chỉnh và TX result</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Ngoại vi</th>
+<th>Chân demo</th>
+<th>Chế độ điện/chức năng</th>
+<th>Cấu hình hiện tại</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LED</td>
+<td>PA5</td>
+<td>GPIO output push-pull</td>
+<td>Toggle bằng thời gian, không delay chặn</td>
+</tr>
+<tr>
+<td>USART2</td>
+<td>PA2 TX, PA3 RX</td>
+<td>AF7</td>
+<td>115200, 8N1; RX IRQ hoặc DMA; TX DMA</td>
+</tr>
+<tr>
+<td>SPI1</td>
+<td>PB3 SCK, PB4 MISO, PB5 MOSI, PB6 CS</td>
+<td>AF5 cho bus, CS GPIO output</td>
+<td>Master, 8-bit, MSB first, mode 0, PCLK2/16</td>
+</tr>
+<tr>
+<td>I2C1</td>
+<td>PB8 SCL, PB9 SDA</td>
+<td>AF4 open-drain; cần pull-up ngoài</td>
+<td>HSI8, TIMINGR <code>0x10420F13</code>, danh định 100 kHz</td>
+</tr>
+<tr>
+<td>CAN1</td>
+<td>PA11 RX, PA12 TX</td>
+<td>AF9; bus thật qua transceiver</td>
+<td>125 kbit/s; mặc định silent loopback</td>
+</tr>
+<tr>
+<td>Nút ngoài</td>
+<td>PB0</td>
+<td>Input pull-up, EXTI0 hai cạnh</td>
+<td>Nhấn nối GND; debounce 30 ms trong main/task</td>
+</tr>
+<tr>
+<td>TIM3</td>
+<td>Không dùng chân output</td>
+<td>Timer nội + update IRQ</td>
+<td>PSC=7999, ARR=99; chu kỳ 100 ms</td>
+</tr>
+<tr>
+<td>TIM2 CH1</td>
+<td>PA0</td>
+<td>AF1 push-pull</td>
+<td>PWM 1 kHz; duty 0–100%, mặc định dừng</td>
+</tr>
+<tr>
+<td>ADC1 IN2</td>
+<td>PA1</td>
+<td>Analog, không pull-up/down</td>
+<td>12-bit; software trigger một mẫu + IRQ</td>
+</tr>
+</tbody>
+</table>
+<p>Đối chiếu chân/AF trong <a href="https://www.st.com/resource/en/datasheet/stm32f334r8.pdf">datasheet STM32F334R8</a>.
+Tín hiệu logic UART của MCU cần mạch chuyển mức phù hợp nếu giao tiếp RS-232
+hoặc RS-485. CAN_TX/CAN_RX nối với transceiver để ra CAN_H/CAN_L; không nối
+thẳng chân logic MCU vào hai dây CAN bus.</p>
+<p><a id="gpio"></a></p>
+<h2>5. GPIO: cầu nối tới chân vật lý</h2>
+<p>Nguồn: <a href="../src/drivers/STM32F334_GPIO.h">GPIO header</a>,
+<a href="../src/drivers/STM32F334.c">GPIO implementation</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Thanh ghi</th>
+<th>Chức năng</th>
+<th>Ý nghĩa với application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RCC AHBENR</td>
+<td>Bật clock GPIO port</td>
+<td>Port có clock mới nhận cấu hình</td>
+</tr>
+<tr>
+<td>MODER</td>
+<td>Input/output/alternate/analog</td>
+<td>Chọn GPIO tự điều khiển hay giao quyền cho ngoại vi</td>
+</tr>
+<tr>
+<td>OTYPER</td>
+<td>Push-pull/open-drain</td>
+<td>SPI output khác I2C dùng pull-up</td>
+</tr>
+<tr>
+<td>PUPDR</td>
+<td>Pull-up/pull-down nội</td>
+<td>Mức mặc định khi đường không được lái</td>
+</tr>
+<tr>
+<td>AFR[0/1]</td>
+<td>Mã alternate function từng pin</td>
+<td>Chọn USART/SPI/I2C/CAN trên pin tương ứng</td>
+</tr>
+<tr>
+<td>IDR</td>
+<td>Mức input</td>
+<td>Đọc tín hiệu đang thấy ở chân</td>
+</tr>
+<tr>
+<td>ODR</td>
+<td>Output latch</td>
+<td>Trạng thái output phần mềm đã đặt</td>
+</tr>
+<tr>
+<td>BSRR</td>
+<td>Set/reset từng pin bằng một lần ghi</td>
+<td>Tránh ghi đè cập nhật của pin khác khi có ISR</td>
+</tr>
+</tbody>
+</table>
+<p><code>GPIO_WriteToOutputPin(GPIOA, 5, SET)</code> ghi bit 5 của BSRR; reset pin 5 ghi bit
+21. Nó không ghi lại cả ODR. <code>GPIO_ToggleOutputPin</code> vẫn cần đọc trạng thái cũ,
+nên các caller cùng sửa output port phải được đồng bộ nếu có cạnh tranh.</p>
+<p>AF không thay thế cấu hình điện. Ví dụ PB8/PB9 cần vừa AF4 vừa open-drain.
+Mạch pull-up bên ngoài tạo mức cao; open-drain kéo mức thấp hoặc nhả đường.
+Chọn được AF4 mà để push-pull có thể làm bus I2C hoạt động sai.</p>
+<p><code>GPIO_DeInit(GPIOA)</code> reset <strong>cả port</strong>, không chỉ một pin. Trong demo PA2/PA3
+và PA5 cùng port A; không reset port đang dùng UART chỉ để tắt LED.</p>
+<p><a id="uart"></a></p>
+<h2>6. UART: byte stream, ngắt, DMA và buffer</h2>
+<p>Nguồn: <a href="../src/drivers/STM32F334_UART.h">UART header</a>,
+<a href="../src/drivers/STM32F334_UART.c">UART implementation</a>.</p>
+<h3>Cấu trúc và ý nghĩa</h3>
+<p>Một ký tự demo 8N1 có cấu trúc logic:</p>
+<pre><code class="language-text">Idle=1 | Start=0 | D0 D1 D2 D3 D4 D5 D6 D7 | Stop=1
+                    8 data bit, LSB trước
+</code></pre>
+<p>UART phần cứng chuyển ký tự. Chuỗi <code>LED ON\n</code> là giao thức dòng do ứng dụng
+đặt ra; ngoại vi không tự biết đó là một lệnh. <code>LineParser_Feed</code> giữ phần dòng
+chưa hoàn chỉnh, xử lý nhiều dòng trong một batch và chỉ gọi <code>command</code> khi có LF.</p>
+<table>
+<thead>
+<tr>
+<th>Phần của UART handle</th>
+<th>Chức năng</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UART_Config</code></td>
+<td>Clock, baud, RX mode, IRQ priority</td>
+<td>Cấu hình ban đầu</td>
+</tr>
+<tr>
+<td><code>RxDMABuffer[256]</code></td>
+<td>DMA ghi raw byte liên tục</td>
+<td>Buffer nhận đầu tiên của chế độ DMA</td>
+</tr>
+<tr>
+<td><code>RxBuffer[512]</code></td>
+<td>ISR/collector đưa byte vào; main/task lấy ra</td>
+<td>Tách nhịp nhận khỏi nhịp parser; dùng được 511 ô</td>
+</tr>
+<tr>
+<td><code>TxBuffer[256]</code></td>
+<td>Write copy byte vào, DMA lấy từng span</td>
+<td>Trả API sớm; dùng được 255 ô</td>
+</tr>
+<tr>
+<td>Head/tail và <code>TxActiveLength</code></td>
+<td>Giữ vị trí/đoạn đang được sử dụng</td>
+<td>Không giải phóng RAM khi DMA còn đọc</td>
+</tr>
+<tr>
+<td><code>Stats.rx_epoch</code></td>
+<td>Đổi khi luồng nhận mất liên tục</td>
+<td>Parser phải bỏ dòng hỏng và đồng bộ lại</td>
+</tr>
+</tbody>
+</table>
+<h3>Kiến trúc RX</h3>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="850" viewBox="0 0 940 850" role="img" aria-labelledby="uart-rx-title">
+<title id="uart-rx-title">UART RX: hai cách nhận, một parser ứng dụng</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">UART RX: hai cách nhận, một parser ứng dụng</text>
+<rect x="260" y="70" width="420" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">PA3 → USART2 RDR</text>
+<text x="470.0" y="122" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Một byte đến từ đường UART</text>
+<polyline points="470,166 470,196 235,196 235,230" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,230 231.08531019299892,221.8959760788259 238.91468980700108,221.8959760788259" fill="#64748b"/>
+<polyline points="470,196 705,196 705,230" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,230 701.0853101929989,221.8959760788259 708.9146898070011,221.8959760788259" fill="#64748b"/>
+<rect x="35" y="230" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="235.0" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">CHỌN RX IRQ</text>
+<text x="235.0" y="282" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE → UART_IRQHandling</text>
+<text x="235.0" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR đọc byte từ RDR</text>
+<rect x="505" y="230" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="705.0" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">HOẶC RX DMA</text>
+<text x="705.0" y="282" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">DMA ghi vào buffer raw 256 byte</text>
+<text x="705.0" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">HT / TC / IDLE báo phần dữ liệu mới</text>
+<polyline points="705,326 705,370" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,370 701.0853101929989,361.8959760788259 708.9146898070011,361.8959760788259" fill="#64748b"/>
+<rect x="505" y="370" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="705.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">COLLECTOR TRONG ISR</text>
+<text x="705.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Copy phần mới từ raw buffer</text>
+<text x="705.0" y="445" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không đọc trùng phần đã lấy</text>
+<polyline points="235,326 235,502 470,502 470,530" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,530 466.0853101929989,521.8959760788259 473.9146898070011,521.8959760788259" fill="#64748b"/>
+<polyline points="705,466 705,502 470,502" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,502 478.1040239211741,498.0853101929989 478.1040239211741,505.9146898070011" fill="#64748b"/>
+<rect x="220" y="530" width="500" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="554" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">RX RING → UART_Read</text>
+<text x="470.0" y="582" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Main hoặc Comm task lấy byte từ ring</text>
+<text x="470.0" y="605" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chưa có ý nghĩa lệnh ở bước này</text>
+<polyline points="470,626 470,674" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,674 466.0853101929989,665.8959760788259 473.9146898070011,665.8959760788259" fill="#64748b"/>
+<rect x="220" y="674" width="500" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="698" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">PARSER → APPLICATION</text>
+<text x="470.0" y="726" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ghép đến LF: LED ON, PING, ...</text>
+<text x="470.0" y="749" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Hiểu lệnh rồi thực hiện công việc</text>
+<text x="470" y="816" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE và DMA là hai lựa chọn thay thế; không cùng tranh đọc RDR.</text>
+</svg></div><figcaption>Luồng nhận UART bằng IRQ hoặc DMA</figcaption></figure>
+
+<p>Hai chế độ RX là lựa chọn thay thế; không để RXNE ISR và DMA cùng lấy RDR.
+Trong chế độ DMA, HT báo nửa buffer, TC báo hết vòng, IDLE báo khoảng nghỉ.
+IDLE giúp lấy đoạn cuối ngắn; HT/TC giúp xử lý stream không có khoảng nghỉ.
+IDLE không phải bằng chứng đã đủ một packet ứng dụng.</p>
+<p><code>rx_dma_collect</code> kết hợp tiến độ TC và CNDTR, copy phần chưa lấy vào RX ring.
+Collector không chỉ so sánh vị trí modulo vì đi hết một vòng có thể trở lại
+cùng vị trí. Nửa buffer 128 byte ở 115200 8N1 mất khoảng 11,1 ms; ISR phải được
+phục vụ kịp trước khi DMA ghi đè vùng cũ. Nhiều vòng bị ghi đè/cờ ngắt bị gộp
+không thể phục hồi chỉ bằng một snapshot CNDTR.</p>
+<h3>Kiến trúc TX và mốc hoàn tất</h3>
+<pre><code class="language-text">text()/application → UART_Write → TxBuffer
+  → UART_Process → DMA1 channel 7 → USART2 TDR → shift register → PA2
+</code></pre>
+<p><code>UART_Write</code> trả số byte đã copy vào queue. DMA TC báo span RAM đã chuyển vào
+ngoại vi, driver mới nhích tail. USART TC báo đã phát hết ký tự trên dây;
+<code>UART_TxIdle</code> kiểm tra thêm mốc này. Khi đổi hướng RS-485 hoặc tắt transmitter,
+cần xét wire completion, không chỉ DMA completion.</p>
+<p>Nếu RX ring đầy, driver bỏ byte mới và tăng counter/epoch. Application lấy
+epoch và byte trong cùng critical section, xóa phần chờ khi epoch đổi và yêu
+cầu parser bỏ tới LF tiếp theo. Nhờ vậy không ghép hai mảnh trước/sau mất byte
+thành một lệnh điều khiển sai.</p>
+<p><a id="spi"></a></p>
+<h2>7. SPI: transaction đồng thời gửi/nhận</h2>
+<p>Nguồn: <a href="../src/drivers/STM32F334_SPI.h">SPI header</a>,
+<a href="../src/drivers/STM32F334_SPI.c">SPI implementation</a>.</p>
+<h3>Cấu trúc và ý nghĩa</h3>
+<p>Master tạo SCK; MOSI mang dữ liệu tới slave, MISO mang dữ liệu về master. Một
+xung clock trao đổi bit theo cả hai hướng. CS chọn thiết bị và bao transaction.
+Ý nghĩa command/address/dummy byte bên trong transaction phụ thuộc datasheet
+thiết bị; SPI bus không tự định nghĩa register map của sensor/Flash.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Mode</th>
+<th style="text-align: right;">CPOL: SCK khi idle</th>
+<th>CPHA: cạnh lấy mẫu</th>
+<th>Cạnh lấy mẫu thực tế</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td>Cạnh thứ nhất</td>
+<td>Lên</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td>Cạnh thứ hai</td>
+<td>Xuống</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td>Cạnh thứ nhất</td>
+<td>Xuống</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">1</td>
+<td>Cạnh thứ hai</td>
+<td>Lên</td>
+</tr>
+</tbody>
+</table>
+<p>Xem giải thích <a href="https://kernel.org/doc/html/v5.16/spi/spi-summary.html">SPI modes trong tài liệu Linux kernel</a>.
+Trong code, mode/speed thuộc <code>SPI_Config</code> và được chụp vào <code>ConfiguredCR1</code> khi
+Init. Muốn đổi chúng: đợi hết công việc, DeInit, đổi Config, Init lại.</p>
+<table>
+<thead>
+<tr>
+<th>Cấu trúc</th>
+<th>Chức năng</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SPI_Config_t</code></td>
+<td>Master, data size, CPOL/CPHA, divisor, priority</td>
+<td>Thiết lập bus trước khi truyền</td>
+</tr>
+<tr>
+<td><code>SPI_Transaction</code></td>
+<td>CS, TX/RX pointer, length, timeout, callback/context</td>
+<td>Một yêu cầu đang chờ hoặc đang chạy</td>
+</tr>
+<tr>
+<td><code>Queue[4]</code>, <code>Active</code></td>
+<td>Bốn descriptor chờ + một active</td>
+<td>Chỉ một transfer sở hữu bus tại mỗi thời điểm</td>
+</tr>
+<tr>
+<td><code>TxCount</code>, <code>RxCount</code>, <code>State</code></td>
+<td>Theo dõi tiến độ từng chiều</td>
+<td>Không nhầm đã nạp TX với đã nhận xong</td>
+</tr>
+</tbody>
+</table>
+<h3>Từ API xuống bus và quay về callback</h3>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="910" viewBox="0 0 940 910" role="img" aria-labelledby="spi-title">
+<title id="spi-title">SPI: nhận yêu cầu trước, báo kết quả sau</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">SPI: nhận yêu cầu trước, báo kết quả sau</text>
+<rect x="170" y="80" width="600" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">1. APPLICATION SUBMIT</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">SPI_Submit copy descriptor vào queue</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TX/RX buffer phải sống tới callback</text>
+<rect x="170" y="212" width="600" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="236" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">2. PROCESS BẮT ĐẦU</text>
+<text x="470.0" y="264" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Lấy transaction, đặt mode và tốc độ</text>
+<text x="470.0" y="287" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Enable SPI, kéo CS xuống thấp</text>
+<polyline points="470,176 470,212" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,212 466.0853101929989,203.8959760788259 473.9146898070011,203.8959760788259" fill="#64748b"/>
+<rect x="170" y="344" width="600" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="368" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">3. NGOẠI VI TRAO ĐỔI BIT</text>
+<text x="470.0" y="396" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">SCK tạo nhịp, MOSI gửi, MISO nhận</text>
+<text x="470.0" y="419" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Một byte TX đi cùng một byte RX</text>
+<polyline points="470,308 470,344" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,344 466.0853101929989,335.8959760788259 473.9146898070011,335.8959760788259" fill="#64748b"/>
+<rect x="170" y="476" width="600" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="500" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">4. IRQ CẬP NHẬT TIẾN ĐỘ</text>
+<text x="470.0" y="528" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TXE ghi DR; RXNE đọc DR</text>
+<text x="470.0" y="551" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Lặp từng byte đến đủ length</text>
+<polyline points="470,440 470,476" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,476 466.0853101929989,467.8959760788259 473.9146898070011,467.8959760788259" fill="#64748b"/>
+<rect x="170" y="608" width="600" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="632" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">5. PROCESS ĐỢI HẾT BẬN</text>
+<text x="470.0" y="660" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đủ RX, TX FIFO rỗng, BSY = 0</text>
+<text x="470.0" y="683" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhả CS; timeout thì báo lỗi</text>
+<polyline points="470,572 470,608" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,608 466.0853101929989,599.8959760788259 473.9146898070011,599.8959760788259" fill="#64748b"/>
+<rect x="170" y="740" width="600" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="764" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">6. CALLBACK VỀ APPLICATION</text>
+<text x="470.0" y="792" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">spi_complete xem dữ liệu hoặc lỗi</text>
+<text x="470.0" y="815" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chạy trong main / Comm task, ngoài ISR</text>
+<polyline points="470,704 470,740" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,740 466.0853101929989,731.8959760788259 473.9146898070011,731.8959760788259" fill="#64748b"/>
+</svg></div><figcaption>Luồng SPI từ Submit đến callback</figcaption></figure>
+
+<p>Driver này dùng <strong>IRQ</strong>, chưa dùng SPI DMA. Để dễ học, chỉ cho một byte đang
+chờ RX: nhận byte đó rồi gửi byte tiếp. <code>tx=NULL</code> tạo clock bằng byte <code>0xFF</code>;
+<code>rx=NULL</code> vẫn đọc DR nhưng bỏ dữ liệu để tránh overflow. DR được truy cập 8 bit
+để không vô tình đóng gói thêm byte trong cấu hình 8-bit.</p>
+<p>Nhận đủ byte chưa phải lý do tùy tiện cắt clock. Process đợi ngoại vi hết bận
+trước khi nhả CS; khi lỗi/timeout sẽ reset controller và báo callback lỗi.
+Callback chạy sau khi khôi phục IRQ, không chạy bên trong SPI ISR.</p>
+<p><a id="i2c"></a></p>
+<h2>8. I2C: địa chỉ, ACK/NACK và repeated START</h2>
+<p>Nguồn: <a href="../src/drivers/STM32F334_I2C.h">I2C header</a>,
+<a href="../src/drivers/STM32F334_I2C.c">I2C implementation</a>.</p>
+<h3>Cấu trúc và ý nghĩa</h3>
+<p>SCL và SDA dùng open-drain cùng pull-up. START mở giao tiếp; địa chỉ chọn thiết
+bị; bit R/W chọn chiều; ACK/NACK xác nhận từng byte; STOP nhả bus. Địa chỉ thiết
+bị và địa chỉ register trong thiết bị là hai khái niệm riêng.</p>
+<p>Demo nhận address <code>0x50</code> chưa dịch. Khi phát, driver tạo byte địa chỉ <code>0xA0</code>
+cho write hoặc <code>0xA1</code> cho read. Các byte TX sau địa chỉ được hiểu theo thiết bị;
+demo dùng một byte register <code>0x00</code>, nhưng thiết bị khác có thể cần prefix khác.</p>
+<pre><code class="language-text">Đọc register:
+START | Address+W | ACK | Register | ACK |
+REPEATED START | Address+R | ACK | Data | master NACK | STOP
+</code></pre>
+<p>NACK mà master phát sau byte đọc cuối là cách kết thúc đọc bình thường.
+<code>I2C_NACK</code> trong driver báo phía bên kia không ACK khi controller đang giao
+tiếp, chẳng hạn không có thiết bị ở địa chỉ đó. Xem <a href="https://www.st.com/resource/en/reference_manual/rm0364-stm32f334xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">RM0364: I2C master receive</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Phần mềm/thanh ghi</th>
+<th>Chức năng</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I2C_Config.I2C_Timing</code> → TIMINGR</td>
+<td>Clock/timing bus</td>
+<td>Không thay bằng baud divider UART</td>
+</tr>
+<tr>
+<td><code>I2C_Transaction.address</code></td>
+<td>Địa chỉ 7-bit chưa dịch</td>
+<td>Driver đặt vào SADD đúng vị trí</td>
+</tr>
+<tr>
+<td>TX/RX pointer + hai length</td>
+<td>Chọn TX-only, RX-only hoặc TX→RX</td>
+<td>Hai pha dùng cùng một transaction khi repeated START</td>
+</tr>
+<tr>
+<td>CR2</td>
+<td>SADD, chiều, NBYTES, START, AUTOEND</td>
+<td>Ra lệnh cho controller thực thi pha</td>
+</tr>
+<tr>
+<td>TXIS/RXNE</td>
+<td>Data register cần ghi/có byte đọc</td>
+<td>ISR chuyển tối đa dữ liệu cần xử lý</td>
+</tr>
+<tr>
+<td>TC</td>
+<td>Pha write đã hết NBYTES ở chế độ không AUTOEND</td>
+<td>Điểm tạo repeated START sang read</td>
+</tr>
+<tr>
+<td>STOPF</td>
+<td>Phần cứng phát hiện STOP</td>
+<td>Đóng transaction; chưa gọi callback trong ISR</td>
+</tr>
+<tr>
+<td>ICR</td>
+<td>Xóa cờ bằng write-one-to-clear</td>
+<td>Ghi mask đúng cờ, không OR toàn bộ status</td>
+</tr>
+</tbody>
+</table>
+<h3>State machine của driver hiện tại</h3>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="850" viewBox="0 0 940 850" role="img" aria-labelledby="i2c-title">
+<title id="i2c-title">I2C: ghi register rồi repeated START để đọc</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C: ghi register rồi repeated START để đọc</text>
+<rect x="250" y="70" width="440" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">IDLE → LẤY TRANSACTION</text>
+<text x="470.0" y="122" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Descriptor chứa address, TX/RX, timeout</text>
+<polyline points="470,166 470,210" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,210 466.0853101929989,201.8959760788259 473.9146898070011,201.8959760788259" fill="#64748b"/>
+<rect x="250" y="210" width="440" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="234" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">WAIT_BUS</text>
+<text x="470.0" y="262" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đợi bus rảnh, có thời hạn</text>
+<text x="470.0" y="285" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không làm kẹt main hoặc task</text>
+<polyline points="470,306 470,337 230,337 230,375" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="230,375 226.08531019299892,366.8959760788259 233.91468980700108,366.8959760788259" fill="#64748b"/>
+<rect x="30" y="375" width="400" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="230.0" y="399" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TX: WRITE REGISTER</text>
+<text x="230.0" y="427" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">START + address WRITE</text>
+<text x="230.0" y="450" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TXIS: gửi byte địa chỉ register</text>
+<rect x="510" y="375" width="400" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="710.0" y="399" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">RX: READ DATA</text>
+<text x="710.0" y="427" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">START + address READ</text>
+<text x="710.0" y="450" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE: lấy byte dữ liệu</text>
+<polyline points="430,423 510,423" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="510,423 501.8959760788259,426.9146898070011 501.8959760788259,419.0853101929989" fill="#64748b"/>
+<text x="710" y="346" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TC → repeated START, không STOP</text>
+<polyline points="710,471 710,518 470,518 470,555" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,555 466.0853101929989,546.8959760788259 473.9146898070011,546.8959760788259" fill="#64748b"/>
+<rect x="250" y="555" width="440" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="579" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">STOPF → DONE</text>
+<text x="470.0" y="607" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Phần cứng đã kết thúc transaction</text>
+<text x="470.0" y="630" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Process mới gọi callback về ứng dụng</text>
+<text x="470" y="714" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TX-only và RX-only cũng được hỗ trợ.</text>
+<text x="470" y="756" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">NACK / lỗi / timeout đi theo đường kết thúc hữu hạn; không chờ vô hạn.</text>
+<text x="470" y="793" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ACK/NACK byte cuối khác với ý nghĩa thành công của lệnh ứng dụng.</text>
+</svg></div><figcaption>Luồng đọc I2C bằng repeated START</figcaption></figure>
+
+<p>Một phase giới hạn 255 byte; driver chưa có RELOAD, 10-bit hay address-only
+probe. Nó không tự retry. Bus bận được chờ có deadline; ARLO không ép STOP
+lên master thắng arbitration. Khi đã yêu cầu dừng do lỗi, có grace period hữu
+hạn trước khi reset controller. Reset controller không bảo đảm giải cứu được
+slave đang giữ SDA/SCL thấp; đó là vấn đề bus vật lý riêng.</p>
+<p>Trong bare-metal, main gọi I2C Process. Trong RTOS, chỉ I2CWorker gọi API này;
+callback luôn ở cùng ngữ cảnh xử lý Process.</p>
+<p><a id="can"></a></p>
+<h2>9. CAN: frame, filter, FIFO và mailbox</h2>
+<p>Nguồn: <a href="../src/drivers/STM32F334_CAN.h">CAN header</a>,
+<a href="../src/drivers/STM32F334_CAN.c">CAN implementation</a>.</p>
+<h3>Cấu trúc và ý nghĩa</h3>
+<p>CAN truyền frame có ID; phần mềm không phải ghép byte bằng newline như UART.
+Các trường logic gồm mở frame, arbitration/ID, control/DLC, data, CRC, ACK và
+kết thúc. Đây là mô tả khái niệm, không phải sơ đồ đầy đủ bit stuffing/delimiter.
+Driver hiện hỗ trợ classical CAN: standard ID 11 bit hoặc extended ID 29 bit,
+data frame và RTR, tối đa 8 byte payload; không phải CAN FD.</p>
+<p>ID mô tả loại/thứ tự ưu tiên thông điệp theo quy ước hệ thống, không nhất thiết
+là địa chỉ một node. Với các frame cùng loại đang tranh bus, ID nhỏ có ưu tiên
+arbitration cao hơn. ACK ở bus cũng không có nghĩa application bên kia đã xử
+lý xong nội dung payload.</p>
+<table>
+<thead>
+<tr>
+<th>Cấu trúc</th>
+<th>Chức năng</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CAN_Config_t</code></td>
+<td>PCLK1, bitrate, normal/loopback, IRQ priority, TX timeout</td>
+<td>Điều khiển bit timing và chế độ controller</td>
+</tr>
+<tr>
+<td><code>CAN_Frame</code></td>
+<td><code>id</code>, <code>dlc</code>, <code>extended</code>, <code>remote</code>, <code>data[8]</code></td>
+<td>Một frame có biên rõ ràng</td>
+</tr>
+<tr>
+<td>Hardware filter</td>
+<td>Chọn frame vào FIFO</td>
+<td>Demo filter mask 0 nhận mọi frame vào FIFO0</td>
+</tr>
+<tr>
+<td>Hardware RX FIFO0/1</td>
+<td>Đệm ngắn trước khi CPU lấy frame</td>
+<td>ISR phải release sau khi copy</td>
+</tr>
+<tr>
+<td>Software RX queue[8]</td>
+<td>Giữ frame chờ main/Comm xử lý</td>
+<td>Không giữ FIFO phần cứng trong lúc application làm việc</td>
+</tr>
+<tr>
+<td>Software TX queue[8]</td>
+<td>Chờ mailbox trống</td>
+<td>Send trả true khi nhận yêu cầu, chưa phát xong</td>
+</tr>
+<tr>
+<td>Ba TX mailbox + <code>inflight[3]</code></td>
+<td>Theo dõi frame đã giao hardware</td>
+<td>Không tái sử dụng mailbox trước completion</td>
+</tr>
+<tr>
+<td>TX result queue[8]</td>
+<td>Frame gốc + status + ESR</td>
+<td>Application biết yêu cầu nào thành công/thất bại</td>
+</tr>
+</tbody>
+</table>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="810" viewBox="0 0 940 810" role="img" aria-labelledby="can-title">
+<title id="can-title">CAN: queue nguyên frame, hai đường RX và TX result</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN: queue nguyên frame, hai đường RX và TX result</text>
+<rect x="30" y="80" width="280" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="170.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION GỬI</text>
+<text x="170.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_Send copy frame</text>
+<rect x="630" y="80" width="280" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="770.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION NHẬN</text>
+<text x="770.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_Receive đọc frame</text>
+<rect x="30" y="225" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="170.0" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">TX QUEUE</text>
+<text x="170.0" y="277" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chờ mailbox trống</text>
+<rect x="630" y="225" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="770.0" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">RX QUEUE</text>
+<text x="770.0" y="277" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR copy rồi release FIFO</text>
+<rect x="30" y="370" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="170.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TX MAILBOX</text>
+<text x="170.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Giao frame cho hardware</text>
+<rect x="630" y="370" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="770.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">FILTER + RX FIFO</text>
+<text x="770.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận frame được chọn</text>
+<rect x="330" y="515" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="539" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">bxCAN CONTROLLER</text>
+<text x="470.0" y="567" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Truyền và nhận frame</text>
+<rect x="330" y="665" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="689" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">MẠCH NGOÀI</text>
+<text x="470.0" y="717" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Transceiver → CAN bus</text>
+<text x="470.0" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Demo dùng loopback nội bộ</text>
+<rect x="30" y="665" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="170.0" y="689" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">TX RESULT</text>
+<text x="170.0" y="717" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_GetTxResult</text>
+<text x="170.0" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Biết OK hoặc lỗi của frame</text>
+<polyline points="170,176 170,225" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="170,225 166.08531019299892,216.8959760788259 173.91468980700108,216.8959760788259" fill="#64748b"/>
+<polyline points="770,225 770,176" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,176 773.9146898070011,184.1040239211741 766.0853101929989,184.1040239211741" fill="#64748b"/>
+<polyline points="170,321 170,370" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="170,370 166.08531019299892,361.8959760788259 173.91468980700108,361.8959760788259" fill="#64748b"/>
+<polyline points="770,370 770,321" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,321 773.9146898070011,329.1040239211741 766.0853101929989,329.1040239211741" fill="#64748b"/>
+<polyline points="170,466 170,563 330,563" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="330,563 321.8959760788259,566.9146898070011 321.8959760788259,559.0853101929989" fill="#64748b"/>
+<polyline points="610,563 770,563 770,466" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,466 773.9146898070011,474.1040239211741 766.0853101929989,474.1040239211741" fill="#64748b"/>
+<polyline points="470,611 470,665" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,665 466.0853101929989,656.8959760788259 473.9146898070011,656.8959760788259" fill="#64748b"/>
+<polyline points="330,589 170,589 170,665" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="170,665 166.08531019299892,656.8959760788259 173.91468980700108,656.8959760788259" fill="#64748b"/>
+<text x="174" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">RQCP / lỗi</text>
+</svg></div><figcaption>Luồng frame CAN RX và TX result</figcaption></figure>
+
+<p>TX timeout không giải phóng mailbox ngay khi ghi ABRQ. Driver chờ RQCP xác
+nhận đã kết thúc/abort, rồi mới xuất TX result và cho dùng lại mailbox. Khi
+bus-off, driver theo dõi ESR và ABOM; frame pending trong software queue được
+giữ, frame đang chạy được xử lý bằng đường abort/result.</p>
+<p>Demo <code>CAN TEST</code> chạy silent loopback, không kiểm chứng transceiver, dây, ACK
+hay bit timing của một mạng thực. Khi chuyển normal mode cần bus và node ACK
+phù hợp. Logic bus/frame của bxCAN được mô tả trong <a href="https://www.st.com/resource/en/reference_manual/rm0364-stm32f334xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">ST RM0364</a>.</p>
+<p><a id="rtos"></a></p>
+<h2>10. FreeRTOS đặt ở đâu trong kiến trúc?</h2>
+<p>RTOS thay cách tổ chức thực thi application; các thanh ghi và tín hiệu UART,
+SPI, I2C, CAN vẫn là các khối phần cứng đó. Driver không cần gọi kernel để
+truyền một byte. Cầu nối ngắt/task được đặt ở application.</p>
+<table>
+<thead>
+<tr>
+<th>Ngữ cảnh</th>
+<th>Sở hữu</th>
+<th>Công việc chính</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bare-metal main</td>
+<td>Các handle demo</td>
+<td>Gọi Process luân phiên, không delay chặn</td>
+</tr>
+<tr>
+<td>RTOS Comm, priority 2</td>
+<td>UART/SPI/CAN, parser, LED, terminal</td>
+<td>Process các driver đó; nhận I2C response; delay 1 tick</td>
+</tr>
+<tr>
+<td>RTOS I2CWorker, priority 1</td>
+<td>I2C handle và transfer active</td>
+<td>Chờ request, submit I2C, chờ IRQ hint/timeout, Process</td>
+</tr>
+<tr>
+<td>RTOS Producer, priority 1</td>
+<td>Lịch phát yêu cầu</td>
+<td>Khi được bật, queue request mỗi 2000 ms</td>
+</tr>
+<tr>
+<td>ISR</td>
+<td>Phần trạng thái/byte cần cập nhật nhanh</td>
+<td>IRQHandling; riêng I2C thêm notification sau driver</td>
+</tr>
+</tbody>
+</table>
+<p>Request queue copy <strong>address/register</strong>; response queue copy <strong>kết quả/byte RX</strong>.
+Worker giữ TX/RX/context trên stack của chính nó tới khi callback đã hoàn tất.
+Comm không sửa handle I2C và Worker không in UART. Nhờ vậy không phải khóa bus
+trong lúc task khác chờ giao tiếp.</p>
+<p>Stats mutex bảo vệ counter/snapshot giữa task. Không giữ nó trong lúc gọi
+driver, đợi queue hoặc in terminal. Task notification chỉ là tín hiệu kiểm tra
+lại trạng thái, không mang packet và không tự chứng minh transfer thành công.</p>
+<pre><code class="language-text">I2C1_EV_IRQHandler
+  → I2C_EVIRQHandling(&amp;hi2c1): chuyển byte/state dưới critical section
+  → khôi phục PRIMASK
+  → RTOS_I2CNotifyFromISR: vTaskNotifyGiveFromISR, có thể pend chuyển task
+  → I2CWorker thức dậy: I2C_Process, callback, queue response
+</code></pre>
+<p>NVIC priority số nhỏ ưu tiên cao; task priority số lớn ưu tiên cao. I2C IRQ
+priority 6 được phép gọi FromISR với threshold 5. SPI IRQ priority 3 không gọi
+kernel. Không gọi mutex hoặc API có thể block trong <code>IRQ_Save</code>/ISR.</p>
+<p>SysTick wrapper tăng millisecond và chuyển tick cho kernel sau khi scheduler
+bắt đầu. SVC/PendSV trỏ thẳng vào port. Bản RTOS dùng static task/queue/mutex,
+không có FreeRTOS heap. Port ARM_CM3 phục vụ đường chạy Cortex-M4 software-float
+hiện tại; không lưu context FPU. Chi tiết tại <a href="../src/rtos/rtos_demo.c">rtos_demo.c</a>,
+<a href="../src/rtos/FreeRTOSConfig.h">FreeRTOSConfig.h</a> và
+<a href="i2c-freertos-learning.md">bài I2C/FreeRTOS</a>.</p>
+<p><a id="walkthrough"></a></p>
+<h2>11. Lần theo các lệnh thực tế</h2>
+<h3>11.1 <code>LED ON</code>: liên kết đủ application → driver → pin</h3>
+<pre><code class="language-text">Terminal gửi &quot;LED ON\n&quot;
+  → PA3 / USART2 / RDR
+  → DMA RX hoặc RXNE ISR
+  → huart2.RxBuffer
+  → console_process: UART_Read
+  → LineParser_Feed: nhận đủ LF
+  → command: nhận diện &quot;LED ON&quot;
+  → GPIO_WriteToOutputPin(GPIOA, 5, SET)
+  → ghi GPIOA BSRR
+  → output latch PA5 lên mức cao
+  → text(&quot;OK&quot;): UART TX ring → DMA TX → TDR → PA2 → terminal
+</code></pre>
+<p>Đặt breakpoint lần lượt ở <code>console_process</code>, <code>LineParser_Feed</code>, <code>command</code>,
+<code>GPIO_WriteToOutputPin</code>. Chú ý: phần parser và lệnh chạy ở main/Comm task,
+không ở USART ISR. Đèn có thay đổi thật hay không còn phụ thuộc phần điện của
+LED và board; source mô tả mức logic đã yêu cầu.</p>
+<h3>11.2 <code>SPI TEST</code>: Submit và callback ở hai thời điểm</h3>
+<ol>
+<li><code>command</code> tạo descriptor trỏ tới <code>spi_tx</code>/<code>spi_rx</code> static và callback.</li>
+<li><code>SPI_Submit(&amp;hspi1, ...)</code> copy descriptor vào queue và return.</li>
+<li>Lần <code>SPI_Process</code> tiếp theo lấy descriptor, cấu hình bus, kéo CS thấp.</li>
+<li>IRQ TXE/RXNE điền byte TX/RX, cập nhật tiến độ.</li>
+<li>Process thấy đủ RX và hardware hết bận, nhả CS, gọi <code>spi_complete</code>.</li>
+<li>Callback in RX bằng UART API; phần cứng UART gửi sau đó.</li>
+</ol>
+<p>Loopback bằng dây nối PB5→PB4 chỉ kiểm tra đường truyền/nhận demo; nó không
+kiểm tra command hay timing yêu cầu bởi một sensor SPI cụ thể.</p>
+<h3>11.3 <code>I2C READ</code> ở FreeRTOS: thêm lớp task queue</h3>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="1120" viewBox="0 0 940 1120" role="img" aria-labelledby="i2c-rtos-title">
+<title id="i2c-rtos-title">Đọc I2C trong RTOS: ai làm gì, theo thứ tự nào?</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đọc I2C trong RTOS: ai làm gì, theo thứ tự nào?</text>
+<rect x="160" y="80" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">1. COMM TASK</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận lệnh I2C READ</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Queue copy address + register</text>
+<rect x="160" y="222" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="246" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">2. I2C WORKER</text>
+<text x="470.0" y="274" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận request; giữ TX/RX buffer</text>
+<text x="470.0" y="297" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C_Submit rồi I2C_Process</text>
+<polyline points="470,176 470,222" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,222 466.0853101929989,213.8959760788259 473.9146898070011,213.8959760788259" fill="#64748b"/>
+<rect x="160" y="364" width="620" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="388" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">3. DRIVER → HARDWARE</text>
+<text x="470.0" y="416" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đặt CR2, gửi START và byte register</text>
+<text x="470.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ngoại vi tạo tín hiệu trên SCL / SDA</text>
+<polyline points="470,318 470,364" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,364 466.0853101929989,355.8959760788259 473.9146898070011,355.8959760788259" fill="#64748b"/>
+<rect x="160" y="506" width="620" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="530" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">4. I2C EV / ER ISR</text>
+<text x="470.0" y="558" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Driver chuyển byte và cập nhật trạng thái</text>
+<text x="470.0" y="581" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhả critical section rồi notify Worker</text>
+<polyline points="470,460 470,506" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,506 466.0853101929989,497.8959760788259 473.9146898070011,497.8959760788259" fill="#64748b"/>
+<rect x="160" y="648" width="620" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="672" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">5. I2C WORKER THỨC DẬY</text>
+<text x="470.0" y="700" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C_Process kiểm tra state hoặc timeout</text>
+<text x="470.0" y="723" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Callback báo kết quả trong Worker</text>
+<polyline points="470,602 470,648" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,648 466.0853101929989,639.8959760788259 473.9146898070011,639.8959760788259" fill="#64748b"/>
+<rect x="160" y="790" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="814" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">6. RESPONSE QUEUE</text>
+<text x="470.0" y="842" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Copy status và byte nhận được</text>
+<text x="470.0" y="865" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Worker không tự in UART</text>
+<polyline points="470,744 470,790" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,790 466.0853101929989,781.8959760788259 473.9146898070011,781.8959760788259" fill="#64748b"/>
+<rect x="160" y="932" width="620" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="956" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">7. COMM TASK</text>
+<text x="470.0" y="984" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận response, hiểu kết quả</text>
+<text x="470.0" y="1007" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Gửi thông báo qua driver UART</text>
+<polyline points="470,886 470,932" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,932 466.0853101929989,923.8959760788259 473.9146898070011,923.8959760788259" fill="#64748b"/>
+<text x="470" y="1062" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Notification là lời nhắc kiểm tra trạng thái, không phải packet dữ liệu.</text>
+</svg></div><figcaption>Luồng I2C giữa Comm task, Worker, driver và ISR</figcaption></figure>
+
+<p>Địa chỉ/register mẫu nằm trong <code>demo_config.h</code>. Bản bare-metal bỏ hai queue
+RTOS: command submit trực tiếp, main Process và callback in kết quả.</p>
+<h3>11.4 <code>CAN TEST</code>: hai đường RX và TX completion</h3>
+<pre><code class="language-text">command → CAN_Send copy CAN_Frame → TX queue → mailbox → bxCAN loopback
+  ├─ RX: filter/FIFO → CAN RX IRQ → RX queue → CAN_Receive → in payload
+  └─ TX: RQCP → collect_completions → TX result queue → CAN_GetTxResult
+</code></pre>
+<p>Không dùng việc thấy frame RX để bỏ qua kiểm tra TX result của API. Hai đường
+có mục đích riêng và không nên dựa vào thứ tự IRQ để xác định ý nghĩa dữ liệu.</p>
+<p><a id="review"></a></p>
+<h2>12. Rà soát, kiểm chứng và cách debug</h2>
+<h3>Những ranh giới đã kiểm tra trong source</h3>
+<table>
+<thead>
+<tr>
+<th>Ranh giới</th>
+<th>Điều cần đúng</th>
+<th>Cách project thực hiện</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Application → driver</td>
+<td>Biết yêu cầu đã nhận hay đã xong</td>
+<td>Write trả số byte; Submit/Send trả acceptance; callback/TX result báo hoàn tất</td>
+</tr>
+<tr>
+<td>Driver → RAM</td>
+<td>Buffer còn sống, không dùng lại quá sớm</td>
+<td>Ring giữ tail tới DMA TC; SPI/I2C giữ pointer tới callback; CAN copy frame</td>
+</tr>
+<tr>
+<td>Driver → register</td>
+<td>Đúng offset, kích thước truy cập và cách xóa flag</td>
+<td>Static assertions; SPI DR 8-bit; ICR/IFCR/EXTI PR ghi mask W1C</td>
+</tr>
+<tr>
+<td>Register → pin</td>
+<td>Clock, AF, electrical mode, thiết bị ngoài phù hợp</td>
+<td>Board config qua GPIO API; I2C OD; CAN transceiver cho normal mode</td>
+</tr>
+<tr>
+<td>ISR → application</td>
+<td>ISR hữu hạn, không chạy parser/user callback</td>
+<td>IRQHandling cập nhật state; Process/callback ở main/task</td>
+</tr>
+<tr>
+<td>Task → task</td>
+<td>Không chia sẻ handle tùy tiện</td>
+<td>Comm sở hữu UART/SPI/CAN/TIM/ADC và IO; Worker sở hữu I2C; queue copy giá trị</td>
+</tr>
+<tr>
+<td>Timeout → recovery</td>
+<td>Không đợi vô hạn hoặc tái dùng tài nguyên đang active</td>
+<td>I2C WAIT_BUS deadline/STOP grace; CAN chờ RQCP sau abort; SPI reset khi timeout</td>
+</tr>
+</tbody>
+</table>
+<p>Trong đợt rà soát này, GPIO ghi từng pin đã chuyển từ RMW ODR sang BSRR, kèm
+regression test. <code>GPIO_ToggleOutputPin</code> vẫn là thao tác dựa vào giá trị cũ và
+được ghi rõ yêu cầu đồng bộ khi có nhiều caller.</p>
+<h3>Debug từ lớp nào khi thấy lỗi?</h3>
+<table>
+<thead>
+<tr>
+<th>Triệu chứng</th>
+<th>Kiểm tra từ dưới lên</th>
+<th>Đích quan sát trong code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UART không thấy byte</td>
+<td>Dây/GND/baud/AF → USART enable → DMA/IRQ → ring</td>
+<td>BRR, ISR, CNDTR, <code>UART_Stats</code>, <code>console_process</code></td>
+</tr>
+<tr>
+<td>UART có byte nhưng không chạy lệnh</td>
+<td>LF/CRLF → parser → command</td>
+<td><code>parser.length</code>, <code>discarding</code>, <code>rx_epoch</code>, <code>rejected_lines</code></td>
+</tr>
+<tr>
+<td>SPI RX toàn FF/00</td>
+<td>MISO/CS/GND → mode/clock → DR → descriptor</td>
+<td>CR1/CR2/SR, TxCount/RxCount, callback result</td>
+</tr>
+<tr>
+<td>I2C NACK</td>
+<td>Pull-up và địa chỉ → đúng 7-bit → thiết bị sẵn sàng</td>
+<td>NACKF, transaction address, <code>Stats.nacks</code></td>
+</tr>
+<tr>
+<td>I2C timeout</td>
+<td>SCL/SDA mức idle → BUSY → IRQ → Process còn được chạy</td>
+<td>State, StartedMs/AbortMs, <code>Stats.timeouts</code></td>
+</tr>
+<tr>
+<td>CAN Send true nhưng không có TX OK</td>
+<td>Queue/mailbox → bus thật/ACK → lỗi controller</td>
+<td><code>CAN_GetTxResult</code>, ESR, inflight, timeout/bus-off counter</td>
+</tr>
+<tr>
+<td>RTOS chỉ một task chạy</td>
+<td>Task priority → có block/delay không → mutex/queue</td>
+<td>task state, high-water mark, <code>g_rtos_fault_*</code></td>
+</tr>
+<tr>
+<td>Có IRQ nhưng không callback</td>
+<td>IRQ wrapper đúng handle → state DONE → Process</td>
+<td><a href="../src/app/interrupts.c">interrupts.c</a>, owner/Initialized, vòng gọi Process</td>
+</tr>
+</tbody>
+</table>
+<h3>Kết quả rà soát của bản code hiện tại</h3>
+<table>
+<thead>
+<tr>
+<th>Kiểm tra</th>
+<th>Kết quả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bare-metal Debug và Release</td>
+<td>Build thành công với <code>-Werror</code></td>
+</tr>
+<tr>
+<td>FreeRTOS Debug và Release</td>
+<td>Build thành công với <code>-Werror</code></td>
+</tr>
+<tr>
+<td>Native tests GPIO/parser/UART/SPI/I2C/CAN/TIM-PWM/ADC</td>
+<td>8/8 bộ kiểm thử đạt</td>
+</tr>
+<tr>
+<td>Vector ngắt</td>
+<td>14 entry cho mỗi bản bare-metal, 16 cho mỗi bản RTOS đúng địa chỉ handler</td>
+</tr>
+<tr>
+<td>Liên kết</td>
+<td>Không có symbol chưa giải quyết; bản RTOS không liên kết heap/malloc</td>
+</tr>
+<tr>
+<td>Nguồn FreeRTOS</td>
+<td>28 file upstream khớp manifest SHA256</td>
+</tr>
+<tr>
+<td>Tài liệu</td>
+<td>UTF-8, code fence và liên kết file/anchor nội bộ đã kiểm tra</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Bản build</th>
+<th style="text-align: right;">Flash: text + data</th>
+<th style="text-align: right;">RAM tĩnh: data + bss</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>debug</td>
+<td style="text-align: right;">20.260 B</td>
+<td style="text-align: right;">2.464 B</td>
+</tr>
+<tr>
+<td>release</td>
+<td style="text-align: right;">35.536 B</td>
+<td style="text-align: right;">2.464 B</td>
+</tr>
+<tr>
+<td>rtos-debug</td>
+<td style="text-align: right;">29.124 B</td>
+<td style="text-align: right;">7.324 B</td>
+</tr>
+<tr>
+<td>rtos-release</td>
+<td style="text-align: right;">48.756 B</td>
+<td style="text-align: right;">7.324 B</td>
+</tr>
+</tbody>
+</table>
+<p>RAM tĩnh của RTOS đã bao gồm stack task; vẫn cần vùng MSP riêng cho startup/ISR.
+Các số này là snapshot của lần rà soát, sẽ đổi khi sửa code/cấu hình.</p>
+<p>Sau khi build đủ bốn preset, có thể chạy lại kiểm tra artifact và tài liệu:</p>
+<pre><code class="language-powershell">python tests/verify_artifacts.py
+</code></pre>
+<p>Script <a href="../tests/verify_artifacts.py">verify_artifacts.py</a> cần các công cụ
+<code>arm-none-eabi-nm</code>, <code>arm-none-eabi-objcopy</code>, <code>arm-none-eabi-size</code> trên PATH.
+Các native tests chạy riêng bằng CMake project <code>tests/</code> như hướng dẫn I2C/FreeRTOS.</p>
+<h3>Mức kiểm chứng và giới hạn</h3>
+<p>Build Debug/Release kiểm tra code ARM và liên kết; register mock trên PC kiểm
+tra state/buffer/lifecycle. Kiểm tra vector xác nhận ISR thật được nối vào
+đúng vị trí và SVC/PendSV của RTOS không rơi vào Default_Handler. Manifest hash
+giúp đối chiếu nguồn FreeRTOS vendored không bị sửa.</p>
+<p>Những kiểm tra đó không đo mức điện, cạnh clock, độ trễ thực, stack margin ở
+mọi đường chạy hay chứng minh scheduler hoạt động trên silicon. Chưa có thử
+nghiệm board thực tế trong phiên này. Cần nạp firmware và đo/quan sát thiết bị
+ngoài; không suy ra bus thật tốt chỉ từ loopback hoặc build thành công.</p>
+<p>Các giới hạn implementation phải nhớ: UART 8N1/USART2; SPI1 master 8-bit IRQ;
+I2C1 master 7-bit, tối đa 255 byte mỗi pha và không address-only probe; CAN cổ
+điển tối đa 8 byte; chưa có lớp driver sensor/Flash cụ thể. Không có SPI/I2C DMA
+trong bản này. FreeRTOS dùng software floating point và static allocation.</p>
+<p><a id="practice"></a></p>
+<h2>13. Lộ trình thực hành và tài liệu gốc</h2>
+<ol>
+<li>Đọc Config/Handle rồi lần theo <code>Board_UARTInit</code> và <code>UART_Init</code>; xác định
+   tham số nào thuộc board, tham số nào thuộc ngoại vi.</li>
+<li>Gửi <code>LED ON</code>, theo đường UART → parser → GPIO → BSRR; phân biệt dữ liệu
+   nhận được với ý nghĩa của dữ liệu đó.</li>
+<li>So sánh UART RXNE và DMA bằng <code>DEMO_UART_USE_DMA</code>; parser giữ nguyên.</li>
+<li>Nối SPI loopback rồi theo TxCount/RxCount và callback; quan sát lý do phải
+   chờ hardware hết bận trước khi nhả CS.</li>
+<li>Thử <code>I2C READ</code> với địa chỉ/register đúng thiết bị; đối chiếu một lần đọc
+   logic analyzer với START/ACK/repeated START/NACK/STOP trong tài liệu.</li>
+<li>Thử CAN loopback trước, đọc cả RX frame lẫn TX result; sau đó mới sang
+   normal mode với transceiver/node/bus đúng cấu hình.</li>
+<li>Chuyển <code>rtos-debug</code>, theo request queue → Worker → IRQ → response queue;
+   kiểm tra task nào sở hữu từng buffer và nơi nào được phép gọi FromISR.</li>
+</ol>
+<p>Các hướng dẫn thao tác chi tiết:</p>
+<ul>
+<li><a href="communication-learning.md">UART/SPI/CAN và form driver giống GPIO</a>.</li>
+<li><a href="i2c-freertos-learning.md">I2C/FreeRTOS: nối dây, build, task, queue và bài tập</a>.</li>
+<li><a href="../README.md">README: lệnh build và các preset</a>.</li>
+<li><a href="https://www.st.com/resource/en/reference_manual/rm0364-stm32f334xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">ST RM0364: ngoại vi, DMA, NVIC, memory map</a>.</li>
+<li><a href="https://www.st.com/resource/en/datasheet/stm32f334r8.pdf">ST STM32F334R8 datasheet: pin/AF và đặc tính điện</a>.</li>
+<li><a href="https://github.com/STMicroelectronics/cmsis-device-f3/blob/master/Include/stm32f334x8.h">ST register definitions để đối chiếu</a>.</li>
+<li><a href="https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/V11.3.3/include/task.h">FreeRTOS V11.3.3 API task</a>, <a href="https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/V11.3.3/include/queue.h">queue</a>, <a href="https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/V11.3.3/include/semphr.h">mutex</a>.</li>
+<li><a href="../third_party/FreeRTOS-Kernel/UPSTREAM.md">Bản kernel, commit và hash đã ghim</a>.</li>
+</ul>
+<p><a id="gpio-input"></a></p>
+<h2>14. GPIO input, EXTI và debounce nút nhấn</h2>
+<p>GPIO có bốn vai trò trong demo: PA5 làm output điều khiển LED, PB0 làm input
+nút nhấn, PA0 ở alternate function cho timer PWM, PA1 ở analog cho ADC.
+Application chọn mục đích; board chọn chân/mode; GPIO driver ghi thanh ghi.
+GPIO không tự biết một mức thấp có nghĩa là “người dùng nhấn nút”.</p>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="770" viewBox="0 0 940 770" role="img" aria-labelledby="gpio-events-title">
+<title id="gpio-events-title">GPIO input: từ nút nhấn tới application</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO input: từ nút nhấn tới application</text>
+<rect x="100" y="85" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="109" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">1. NÚT NGOÀI → PB0</text>
+<text x="470.0" y="137" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nút nối PB0 xuống GND; pull-up nội giữ mức 1 khi nhả</text>
+<text x="470.0" y="160" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhấn = 0, nhả = 1; tiếp điểm có thể bị dội</text>
+<rect x="100" y="241" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="265" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">2. GPIO + SYSCFG + EXTI</text>
+<text x="470.0" y="293" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">MODER input, PUPDR pull-up, EXTICR chọn port B</text>
+<text x="470.0" y="316" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RTSR / FTSR bắt hai cạnh; IMR cho phép báo ngắt</text>
+<polyline points="470,191 470,241" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,241 466.0853101929989,232.8959760788259 473.9146898070011,232.8959760788259" fill="#64748b"/>
+<rect x="100" y="397" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="421" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">3. EXTI0 IRQ → DRIVER</text>
+<text x="470.0" y="449" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">IO_Demo_GPIOIRQ → GPIO_IRQHandling(0)</text>
+<text x="470.0" y="472" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Xóa PR bằng W1C; chỉ đếm cạnh, không delay trong ISR</text>
+<polyline points="470,347 470,397" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,397 466.0853101929989,388.8959760788259 473.9146898070011,388.8959760788259" fill="#64748b"/>
+<rect x="100" y="553" width="740" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="577" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">4. MAIN / COMM TASK</text>
+<text x="470.0" y="605" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">IO_Demo_Process chờ 30 ms từ cạnh được quan sát cuối</text>
+<text x="470.0" y="628" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Xác nhận mức ổn định; đếm lần nhấn hoặc in UART</text>
+<polyline points="470,503 470,553" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,553 466.0853101929989,544.8959760788259 473.9146898070011,544.8959760788259" fill="#64748b"/>
+<text x="470" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO READ xem mức tức thời; GPIO WATCH ON xem sự kiện đã debounce.</text>
+</svg></div><figcaption>GPIO input và debounce trong application</figcaption></figure>
+
+<h3>Cấu trúc, chức năng và ý nghĩa</h3>
+<table>
+<thead>
+<tr>
+<th>Thành phần</th>
+<th>Chức năng</th>
+<th>Vì sao cần</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GPIO_PinConfig</code></td>
+<td>Chọn pin, mode, pull-up/down, tốc độ, output type, AF</td>
+<td>Tách cấu hình chân khỏi logic ứng dụng</td>
+</tr>
+<tr>
+<td><code>GPIO_Handle_t</code></td>
+<td>Ghép địa chỉ port với cấu hình</td>
+<td>Cùng API áp dụng cho nhiều pin/port</td>
+</tr>
+<tr>
+<td>SYSCFG EXTICR</td>
+<td>Nối PB0 tới EXTI line 0</td>
+<td>PA0/PB0 cùng số pin dùng chung line, phải chọn port</td>
+</tr>
+<tr>
+<td>EXTI RTSR/FTSR, IMR</td>
+<td>Chọn cạnh lên/xuống và cho phép ngắt</td>
+<td>Phát hiện thay đổi mà không polling liên tục</td>
+</tr>
+<tr>
+<td>EXTI PR</td>
+<td>Lưu sự kiện đang chờ; ghi 1 để xóa</td>
+<td>ISR xác nhận đúng line đã được phục vụ</td>
+</tr>
+<tr>
+<td><code>gpio_edges</code></td>
+<td>ISR đếm cạnh quan sát được</td>
+<td>Giữ ISR ngắn; cạnh điện chưa phải lần nhấn hợp lệ</td>
+</tr>
+<tr>
+<td><code>stable_input</code>, <code>changed_ms</code>, <code>presses</code></td>
+<td>Main/task xác nhận mức ổn định sau 30 ms</td>
+<td>Loại dội tiếp điểm bằng phần mềm</td>
+</tr>
+</tbody>
+</table>
+<p>Đường gọi thật: <code>Board_GPIOInputInit</code> → <code>GPIO_Init</code> cấu hình input, pull-up,
+SYSCFG/EXTI → <code>GPIO_IRQConfig</code> bật NVIC. Khi PB0 đổi mức:
+<code>EXTI0_IRQHandler</code> → <code>IO_Demo_GPIOIRQ</code> → <code>GPIO_IRQHandling(0)</code> xóa pending và
+đếm cạnh. <code>IO_Demo_Process</code> mới debounce rồi quyết định in sự kiện.</p>
+<p>Debounce tính từ cạnh cuối mà phần mềm đã quan sát; thời gian phản hồi gồm
+30 ms và độ trễ main/task. Nếu chặn CPU hoặc che IRQ lâu, nhiều cạnh có thể
+bị gộp trong một pending bit. Đây không phải bộ đếm xung chính xác cho encoder.
+ISR không delay, không in UART. Nút đang giữ lúc khởi động là trạng thái ban
+đầu, chưa được tính là một lần nhấn mới.</p>
+<h3>Thử trên board</h3>
+<p>Nối <strong>nút ngoài giữa PB0 và GND</strong>, dùng pull-up nội. Đây không phải cấu hình
+nút B1 có sẵn trên Nucleo. Gửi từng dòng bằng terminal UART:</p>
+<pre><code class="language-text">GPIO READ
+GPIO WATCH ON
+GPIO READ
+GPIO WATCH OFF
+LED ON
+LED OFF
+</code></pre>
+<p>Khi nhả nút, PB0 thường bằng 1; khi nhấn bằng 0. <code>edges</code> có thể tăng nhiều
+hơn <code>debounced presses</code>. Đó là điểm để quan sát sự khác nhau giữa cạnh điện
+và sự kiện ứng dụng. <code>GPIO READ</code> trả mức tức thời và bộ đếm lần nhấn đã debounce.</p>
+<p>Nguồn để lần theo: <a href="../src/drivers/STM32F334_GPIO.h">GPIO API</a>,
+<a href="../src/drivers/STM32F334.c">GPIO driver</a>,
+<a href="../src/app/board_peripherals.c">board configuration</a>,
+<a href="../src/app/io_demo.c">IO application</a>, <a href="../src/app/interrupts.c">ISR wrappers</a>.</p>
+<p><a id="timer"></a></p>
+<h2>15. Timer: clock, bộ đếm, update và callback</h2>
+<p>Timer là phần cứng đếm xung clock ngay cả khi CPU chạy việc khác. Demo dùng
+<strong>TIM3 làm timer chu kỳ 100 ms</strong>, độc lập với SysTick 1 ms của timebase/FreeRTOS.
+PWM ở phần sau dùng TIM2 riêng, nên đổi duty không đổi lịch TIM3.</p>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="790" viewBox="0 0 940 790" role="img" aria-labelledby="timer-pwm-title">
+<title id="timer-pwm-title">Timer: bộ đếm cho periodic IRQ và PWM</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Timer: bộ đếm cho periodic IRQ và PWM</text>
+<rect x="185" y="80" width="570" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">BOARD: CLOCK TIMER = 8 MHz</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC chia clock; CNT đếm từ 0 tới ARR</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Update event nạp preload rồi bắt đầu chu kỳ mới</text>
+<polyline points="470,186 470,220 235,220 235,260" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,260 231.08531019299892,251.8959760788259 238.91468980700108,251.8959760788259" fill="#64748b"/>
+<polyline points="470,220 705,220 705,260" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,260 701.0853101929989,251.8959760788259 708.9146898070011,251.8959760788259" fill="#64748b"/>
+<rect x="35" y="260" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="235.0" y="284" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TIM3: PERIODIC IRQ</text>
+<text x="235.0" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC = 7999, ARR = 99</text>
+<text x="235.0" y="335" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">10 Hz → mỗi 100 ms có update</text>
+<rect x="505" y="260" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="705.0" y="284" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TIM2 CH1: PWM</text>
+<text x="705.0" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC = 7, ARR = 999</text>
+<text x="705.0" y="335" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">1 kHz; CCR1 chọn thời gian high</text>
+<polyline points="235,366 235,415" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,415 231.08531019299892,406.8959760788259 238.91468980700108,406.8959760788259" fill="#64748b"/>
+<polyline points="705,366 705,415" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,415 701.0853101929989,406.8959760788259 708.9146898070011,406.8959760788259" fill="#64748b"/>
+<rect x="35" y="415" width="400" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="235.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">UIF → TIM3_IRQHandler</text>
+<text x="235.0" y="467" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIM_IRQHandling đếm update</text>
+<text x="235.0" y="490" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIM_Process gọi callback ở task</text>
+<rect x="505" y="415" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="705.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">CNT &lt; CCR1 → HIGH</text>
+<text x="705.0" y="467" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM mode 1, active high</text>
+<text x="705.0" y="490" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">AF1 đưa TIM2_CH1 ra PA0</text>
+<polyline points="235,521 235,570" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,570 231.08531019299892,561.8959760788259 238.91468980700108,561.8959760788259" fill="#64748b"/>
+<polyline points="705,521 705,570" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,570 701.0853101929989,561.8959760788259 708.9146898070011,561.8959760788259" fill="#64748b"/>
+<rect x="35" y="570" width="400" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="235.0" y="594" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION</text>
+<text x="235.0" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIMER STATS xem số update</text>
+<text x="235.0" y="645" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR không in UART hay xử lý lệnh</text>
+<rect x="505" y="570" width="400" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="705.0" y="594" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION</text>
+<text x="705.0" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM 25 → CCR1 = 250</text>
+<text x="705.0" y="645" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM START phát xung, không cần IRQ</text>
+<text x="470" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">SysTick vẫn tạo tick hệ thống; TIM3 và TIM2 là hai bộ timer độc lập.</text>
+</svg></div><figcaption>Timer periodic IRQ và PWM phần cứng</figcaption></figure>
+
+<h3>Cấu trúc và chức năng</h3>
+<table>
+<thead>
+<tr>
+<th>Phần</th>
+<th>Chức năng</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TIM_Config_t</code></td>
+<td>Timer clock, PSC, ARR, mode, priority</td>
+<td>Các giá trị ban đầu do board quyết định</td>
+</tr>
+<tr>
+<td><code>TIM_Handle_t</code></td>
+<td>Địa chỉ timer, cấu hình, state, counter, callback/context</td>
+<td>Mỗi timer có trạng thái riêng; một owner main/task</td>
+</tr>
+<tr>
+<td>PSC</td>
+<td>Chia clock đầu vào theo <code>PSC+1</code></td>
+<td>Tạo độ phân giải của bộ đếm</td>
+</tr>
+<tr>
+<td>CNT</td>
+<td>Bộ đếm hiện tại</td>
+<td>Đếm từ 0 tới ARR trong chế độ up-counting</td>
+</tr>
+<tr>
+<td>ARR</td>
+<td>Auto-reload; chu kỳ có <code>ARR+1</code> tick</td>
+<td>Quyết định khoảng thời gian giữa các update</td>
+</tr>
+<tr>
+<td>EGR.UG</td>
+<td>Tạo update bằng phần mềm</td>
+<td>Nạp PSC/ARR preload khi khởi tạo/start</td>
+</tr>
+<tr>
+<td>DIER.UIE / SR.UIF</td>
+<td>Cho phép update IRQ / cờ update</td>
+<td>Nối sự kiện timer tới NVIC và ISR</td>
+</tr>
+<tr>
+<td><code>PendingUpdates</code></td>
+<td>Gom số IRQ chưa xử lý</td>
+<td>Task xử lý callback sau, không chạy user code trong ISR</td>
+</tr>
+</tbody>
+</table>
+<p>Với edge-aligned up-counting:</p>
+<pre><code class="language-text">f_counter = f_timer / (PSC + 1)
+f_update  = f_timer / ((PSC + 1) × (ARR + 1))
+
+TIM3: 8.000.000 / (7999 + 1) = 1000 tick/s
+      1000 / (99 + 1) = 10 update/s → chu kỳ 100 ms
+</code></pre>
+<p><code>TIM_ClockHz</code> là clock timer thực tế, không mặc định bằng CPU clock. Với TIM2/3,
+APB1 prescaler bằng 1 thì timer dùng PCLK1; nếu APB1 bị chia thì timer dùng
+2 × PCLK1. Driver nhận clock từ board, không tự đổi clock tree. Project đang
+giữ HSI/HCLK/PCLK1 ở 8 MHz nên <code>DEMO_TIMER_HZ = 8000000</code>.</p>
+<h3>Application → driver → hardware → application</h3>
+<ol>
+<li><code>IO_Demo_Init</code> → <code>Board_TimerInit</code>: chọn TIM3, PSC=7999, ARR=99.</li>
+<li><code>TIM_Init</code> bật RCC, reset timer, ghi PSC/ARR, tạo UG nạp preload rồi xóa
+   cờ update do chính UG tạo ra. Init chưa tính đây là một chu kỳ đã trôi qua.</li>
+<li><code>TIM_Start_IT</code> bật UIE, NVIC và CR1.CEN. Phần cứng bắt đầu đếm.</li>
+<li>Tràn bộ đếm → UIF → <code>TIM3_IRQHandler</code> → <code>TIM_IRQHandling</code> xóa UIF,
+   tăng <code>Updates</code> và <code>PendingUpdates</code>.</li>
+<li><code>CommunicationDemo_Process</code> → <code>IO_Demo_Process</code> → <code>TIM_Process</code> lấy số
+   pending và gọi <code>timer_elapsed(count, context)</code> ở main hoặc Comm task.</li>
+</ol>
+<p>Callback có thể nhận <code>count &gt; 1</code> nếu task chưa xử lý kịp nhiều IRQ.
+<code>TIMER STATS</code> hiển thị <code>updates</code> được ISR ghi nhận và <code>processed</code> được callback
+xử lý; hai số có thể lệch tạm thời. Nếu che IRQ qua nhiều chu kỳ, UIF chỉ giữ
+một bit nên không thể khôi phục số chu kỳ đã mất. <code>DroppedUpdates</code> chỉ phản
+ánh tràn bộ đếm pending trong phần mềm, không đo được các sự kiện bị gộp ấy.</p>
+<p><strong>Cách xóa cờ khác nhau:</strong> TIM SR dùng ghi <strong>0</strong> để xóa; driver ghi <code>SR = ~UIF</code>
+để giữ cờ khác. EXTI PR và ADC ISR dùng ghi <strong>1</strong> để xóa. Không áp dụng một
+công thức <code>|=</code> chung cho mọi status register.</p>
+<p>Timer tự chạy ngay sau init demo. Thử:</p>
+<pre><code class="language-text">TIMER STATS
+TIMER STOP
+TIMER STATS
+TIMER START
+TIMER STATS
+</code></pre>
+<p><code>Stop</code> bỏ callback đang pending, giữ counter thống kê tích lũy. Start bắt đầu
+chu kỳ mới; gọi Start khi đã chạy trả thất bại. <code>TIM_DeInit</code> chỉ thành công
+khi đã dừng và không ở trong callback. TIM3 ARR tối đa 65535 vì là timer 16-bit.</p>
+<p>Đọc <a href="../src/drivers/STM32F334_TIM.h">TIM API</a> rồi
+<a href="../src/drivers/STM32F334_TIM.c">TIM implementation</a>; đối chiếu đường gọi tại
+<a href="../src/app/io_demo.c">io_demo.c</a> và <a href="../src/app/interrupts.c">interrupts.c</a>.</p>
+<p><a id="pwm"></a></p>
+<h2>16. PWM: chu kỳ, duty và chân output</h2>
+<p>PWM dùng timer để đổi tỷ lệ thời gian mức high trong mỗi chu kỳ. Demo dùng
+<strong>TIM2 channel 1 → PA0 AF1</strong>, PWM mode 1, active high, edge-aligned.
+Đây là tín hiệu số giữa low/high; muốn điện áp analog mượt cần mạch lọc phù hợp.</p>
+<table>
+<thead>
+<tr>
+<th>Thành phần</th>
+<th>Chức năng</th>
+<th>Ý nghĩa trong demo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PSC, ARR</td>
+<td>Tạo chu kỳ PWM</td>
+<td>PSC=7, ARR=999 → 1 kHz, chu kỳ 1 ms</td>
+</tr>
+<tr>
+<td>CCR1</td>
+<td>Ngưỡng so sánh CNT</td>
+<td>CNT &lt; CCR1 thì output high</td>
+</tr>
+<tr>
+<td>CCMR1.OC1M</td>
+<td>Chọn PWM mode 1 hoặc forced inactive</td>
+<td>Phát PWM khi chạy, ép low khi dừng</td>
+</tr>
+<tr>
+<td>CCMR1.OC1PE</td>
+<td>Bật preload CCR1</td>
+<td>Duty mới có hiệu lực ở update kế tiếp</td>
+</tr>
+<tr>
+<td>CCER.CC1E</td>
+<td>Cho phép channel output</td>
+<td>Nối tín hiệu so sánh tới output timer</td>
+</tr>
+<tr>
+<td>GPIO AFRL/MODER</td>
+<td>Chọn AF1 trên PA0</td>
+<td>Đưa TIM2_CH1 ra chân thay vì GPIO ODR</td>
+</tr>
+<tr>
+<td><code>DutyPermille</code></td>
+<td>Giá trị 0–1000</td>
+<td>API driver dùng độ phân giải 0,1%; CLI dùng phần trăm</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-text">f_PWM = 8.000.000 / ((7 + 1) × (999 + 1)) = 1000 Hz
+duty  = CCR1 / (ARR + 1)
+
+  0% → CCR1 =    0 → luôn low
+ 25% → CCR1 =  250 → high 250 µs, low 750 µs
+ 50% → CCR1 =  500 → high 500 µs, low 500 µs
+100% → CCR1 = 1000 → luôn high vì CNT chỉ tới 999
+</code></pre>
+<p>Đường gọi: lệnh <code>PWM 25</code> → <code>IO_Demo_Command</code> →
+<code>TIM_PWM_SetDuty(&amp;hpwm2, 250)</code> → CCR1 preload. <code>PWM START</code> →
+<code>TIM_PWM_Start</code> bật channel/counter → phần cứng so sánh và tạo xung trên PA0.
+CPU không cần đảo chân từng chu kỳ; nhánh PWM này không dùng IRQ.
+Khi đang chạy, cập nhật duty không tạo UG, để thay đổi ở biên chu kỳ kế tiếp.</p>
+<h3>Thử và quan sát</h3>
+<p>Nối đầu đo oscilloscope/logic analyzer vào PA0, GND về GND board:</p>
+<pre><code class="language-text">PWM 25
+PWM START
+PWM STATS
+PWM 50
+PWM 100
+PWM 0
+PWM STOP
+</code></pre>
+<p>Mặc định PWM dừng. Đặt duty khi dừng chỉ chuẩn bị giá trị cho lần Start;
+đặt duty khi đang chạy cập nhật ngay ở chu kỳ tự nhiên kế tiếp. <code>PWM STOP</code>
+ép channel low, giữ duty đã chọn để lần Start dùng lại. <code>ADC PWM OFF</code> chỉ
+ngừng liên kết ADC → duty; muốn ngừng output phải dùng <code>PWM STOP</code>.</p>
+<p>Driver hiện chỉ có TIM2 CH1 PWM và TIM3 base IRQ. Chưa có input capture,
+encoder, center-aligned, complementary output, dead-time, PWM DMA hay HRTIM.
+Nguồn PWM cùng <a href="../src/drivers/STM32F334_TIM.c">TIM driver</a>;
+pin được chọn trong <a href="../src/app/board_peripherals.c">Board_PWMInit</a>.</p>
+<p><a id="adc"></a></p>
+<h2>17. ADC: lấy mẫu điện áp và liên kết ADC → PWM</h2>
+<p>ADC biến điện áp tại chân thành số. Demo dùng <strong>PA1 = ADC1_IN2</strong>, 12-bit,
+right-aligned, single-ended, software trigger, một mẫu mỗi <code>ADC READ</code>.
+PA1 được cấu hình analog và không bật pull-up/down; đường này không dùng AF.</p>
+<figure><div class="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="940" height="945" viewBox="0 0 940 945" role="img" aria-labelledby="adc-pwm-title">
+<title id="adc-pwm-title">ADC: điện áp → số → quyết định PWM</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC: điện áp → số → quyết định PWM</text>
+<rect x="100" y="80" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">1. PHẦN CỨNG NGOÀI</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Biến trở: hai đầu 3V3 / GND, con chạy → PA1</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO analog nối PA1 tới ADC1_IN2</text>
+<rect x="100" y="235" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="259" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">2. ADC_INIT</text>
+<text x="470.0" y="287" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC clock HCLK/2 = 4 MHz; bật regulator, calibration</text>
+<text x="470.0" y="310" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chọn sample time, kênh và regular sequence dài 1</text>
+<polyline points="470,186 470,235" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,235 466.0853101929989,226.8959760788259 473.9146898070011,226.8959760788259" fill="#64748b"/>
+<rect x="100" y="390" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="414" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">3. ADC READ → ADC_Start_IT</text>
+<text x="470.0" y="442" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADSTART bắt đầu lấy mẫu rồi chuyển đổi 12-bit</text>
+<text x="470.0" y="465" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Kết quả 0..4095 nằm trong DR; EOC báo có mẫu</text>
+<polyline points="470,341 470,390" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,390 466.0853101929989,381.8959760788259 473.9146898070011,381.8959760788259" fill="#64748b"/>
+<rect x="100" y="545" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="569" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">4. ADC1_2_IRQHandler</text>
+<text x="470.0" y="597" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC_IRQHandling đọc DR, cập nhật Value và Done</text>
+<text x="470.0" y="620" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không tính mV, không in UART, không gọi callback</text>
+<polyline points="470,496 470,545" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,545 466.0853101929989,536.8959760788259 473.9146898070011,536.8959760788259" fill="#64748b"/>
+<rect x="100" y="700" width="740" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="724" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">5. MAIN / COMM TASK</text>
+<text x="470.0" y="752" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC_Process gọi adc_complete; application tính mV</text>
+<text x="470.0" y="775" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC PWM ON: đổi mẫu thành duty rồi cập nhật TIM2</text>
+<polyline points="470,651 470,700" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,700 466.0853101929989,691.8959760788259 473.9146898070011,691.8959760788259" fill="#64748b"/>
+<text x="470" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Mỗi ADC READ lấy một mẫu. Đây chưa phải vòng điều khiển chạy liên tục.</text>
+</svg></div><figcaption>Luồng ADC từ chân analog tới callback và PWM</figcaption></figure>
+
+<h3>Cấu trúc, chức năng và ý nghĩa</h3>
+<table>
+<thead>
+<tr>
+<th>Phần</th>
+<th>Chức năng</th>
+<th>Vì sao cần</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ADC_Config_t</code></td>
+<td>Clock hiện tại, channel, sample time, IRQ priority</td>
+<td>Chọn cách lấy mẫu trước khi chạy</td>
+</tr>
+<tr>
+<td><code>ADC_Handle_t</code></td>
+<td>State Busy/Done, Value, timeout, thống kê, callback/context</td>
+<td>Nối lúc gửi yêu cầu với lúc có kết quả</td>
+</tr>
+<tr>
+<td>ADC12 common CCR.CKMODE</td>
+<td>Chọn clock ADC đồng bộ HCLK/2</td>
+<td>HCLK8 → ADC4 MHz; không nhầm với PCLK1</td>
+</tr>
+<tr>
+<td>CR.ADVREGEN / ADCAL / ADEN</td>
+<td>Bật regulator, tự calibration, enable ADC</td>
+<td>Chuẩn bị khối analog trước khi đo</td>
+</tr>
+<tr>
+<td>SMPR1/2</td>
+<td>Thời gian nạp tụ sample-and-hold</td>
+<td>Nguồn trở kháng cao cần thời gian ổn định phù hợp</td>
+</tr>
+<tr>
+<td>SQR1</td>
+<td>Kênh và độ dài regular sequence</td>
+<td>Demo L=0: một chuyển đổi trên channel 2</td>
+</tr>
+<tr>
+<td>CR.ADSTART</td>
+<td>Bắt đầu regular conversion</td>
+<td>API return khi yêu cầu đã bắt đầu, chưa có mẫu ngay</td>
+</tr>
+<tr>
+<td>ISR.EOC / OVR và DR</td>
+<td>Báo mẫu sẵn/lỗi overrun; chứa kết quả</td>
+<td>ISR đọc dữ liệu, cập nhật trạng thái</td>
+</tr>
+<tr>
+<td><code>ADC_Process</code></td>
+<td>Kiểm tra deadline và gọi callback</td>
+<td>Logic ứng dụng chạy ngoài ISR</td>
+</tr>
+</tbody>
+</table>
+<h3>Init khác với Read như thế nào?</h3>
+<p><code>Board_ADCInit</code> cấu hình PA1 analog rồi gọi <code>ADC_Init</code>. Driver bật clock/reset
+ADC12, chọn HCLK/2, single-ended, 12-bit, sample time 601,5 ADC cycle và sequence
+một kênh. Sau đó regulator bật → chờ ổn định → calibration → chờ → ADEN → ADRDY.
+Sample time dài được chọn để dễ thử bằng biến trở; tốc độ lấy mẫu tối đa chưa
+phải mục tiêu bài học này.</p>
+<p>Driver chờ hai tick SysTick cho mỗi khoảng ổn định, rộng hơn yêu cầu phần cứng
+regulator tối thiểu 10 µs và khoảng sau calibration tối thiểu 4 ADC clock.
+Init có chờ ngắn trong main/task, giữ IRQ hoạt động và có timeout/poll bound.
+Phải gọi <code>Timebase_Init</code> trước; không Init khi đang mask IRQ. Bản này chỉ chấp
+nhận HSI/HCLK8, không tự hỗ trợ mọi clock tree.</p>
+<p><code>ADC_Start_IT</code> đặt callback/deadline, bật EOC/OVR interrupt, ghi ADSTART rồi
+return. Có mẫu → <code>ADC1_2_IRQHandler</code> → <code>ADC_IRQHandling</code> đọc DR, lưu Value,
+đặt Done. Vòng <code>IO_Demo_Process</code> gọi <code>ADC_Process</code> → <code>adc_complete</code> tính mV
+và in UART. ADC không tự biết raw value là nhiệt độ, áp pin hay vị trí biến trở.</p>
+<p>Nếu hết deadline 50 ms, driver reset ADC12, trả <code>ADC_TIMEOUT</code> qua callback và
+đặt <code>Initialized=false</code>. Gửi <code>ADC INIT</code> để calibration lại trước lần Read mới;
+sample đến muộn không được dùng cho request tiếp theo. Handle thuộc một
+main/task. Driver giữ độc quyền <strong>ADC12 common/reset/clock</strong>, chưa cho dùng ADC2
+đồng thời; reset nhóm này sẽ ảnh hưởng ADC2 nếu tự dùng nó ngoài driver.</p>
+<h3>Nối dây và đọc giá trị</h3>
+<p>Dùng biến trở, ví dụ 10 kΩ: hai đầu nối <strong>3V3 và GND của board</strong>, con chạy nối
+<strong>PA1</strong>. Điện áp đo phải nằm trong 0 đến VDDA/VREF+; dùng cùng GND, không đưa
+5 V vào ngõ analog và không để chân đo trôi nổi.</p>
+<pre><code class="language-text">ADC STATS
+ADC READ
+ADC READ
+</code></pre>
+<p>Demo đã Init ADC lúc khởi động. Nếu báo not ready, dùng <code>ADC INIT</code> và quan sát
+kết quả. Xoay biến trở rồi Read lại: gần GND kỳ vọng raw gần 0, gần 3V3 kỳ vọng
+gần 4095. Sai số, VDDA thực tế và trở kháng nguồn ảnh hưởng số đo.</p>
+<pre><code class="language-text">raw: 0..4095
+mV xấp xỉ = raw × DEMO_ADC_VREF_MV / 4095
+</code></pre>
+<p><code>DEMO_ADC_VREF_MV = 3300</code> chỉ là giả định điện áp tham chiếu của application.
+Con số mV in ra là ước lượng thang đo, chưa bù VREFINT, offset/gain hay sai số
+nguồn. Calibration ADC không làm VDDA thực tế tự trở thành đúng 3300 mV.</p>
+<h3>Liên kết application ADC → PWM</h3>
+<pre><code class="language-text">ADC PWM ON
+ADC READ
+PWM STATS
+ADC READ
+ADC PWM OFF
+PWM STOP
+</code></pre>
+<p>Khi liên kết bật, <code>adc_complete</code> đổi raw thành duty 0–1000, gọi
+<code>TIM_PWM_SetDuty</code>, rồi Start PWM nếu đang dừng. Xoay biến trở, gửi <code>ADC READ</code>
+và quan sát duty PA0. ADC driver chỉ trả sample; application quyết định công
+thức và gọi timer driver. Hai driver không gọi trực tiếp vào nhau.</p>
+<p>Mỗi <code>ADC READ</code> vẫn chỉ lấy một mẫu, chưa có sampling định kỳ hay vòng điều
+khiển liên tục. Nếu nối PA0 PWM thẳng vào PA1, ADC thấy mức tức thời của xung,
+có thể gần 0 hoặc full-scale; muốn đo điện áp trung bình theo duty cần bộ lọc
+RC và chờ ổn định. Không suy ra 50% PWM sẽ tự đọc được nửa thang ADC.</p>
+<h3>File để đọc và việc cần kiểm chứng</h3>
+<ul>
+<li><a href="../src/drivers/STM32F334_ADC.h">ADC API</a> và <a href="../src/drivers/STM32F334_ADC.c">ADC driver</a>: lifecycle, calibration, IRQ, timeout.</li>
+<li><a href="../src/drivers/STM32F334_TIM.h">TIM API</a> và <a href="../src/drivers/STM32F334_TIM.c">TIM driver</a>: PWM và counter IRQ.</li>
+<li><a href="../src/app/io_demo.c">io_demo.c</a>: command, debounce, callback và chuyển raw → duty.</li>
+<li><a href="../src/app/board_peripherals.c">board_peripherals.c</a>: cấu hình chân, clock, handle.</li>
+<li><a href="../src/drivers/STM32F334.h">STM32F334.h</a>: ADC1/ADC2/common và TIM register map. Offset ADC đã sửa và có static assertions; ADC2 ở ADC1+0x100, common ở ADC1+0x300.</li>
+<li><a href="../tests/test_tim.c">test_tim.c</a>, <a href="../tests/test_adc.c">test_adc.c</a>: mock kiểm tra ownership, ISR/deferred callback, duty biên, overrun và timeout/reinit.</li>
+</ul>
+<p>Trong bản FreeRTOS, Comm task sở hữu IO/TIM/ADC; I2C vẫn thuộc Worker.
+Không tạo task mới và không chiếm SysTick của scheduler. Các ISR mới không
+gọi API FreeRTOS; callback vẫn chạy trong Comm task. Cần đo stack high-water
+trên board khi thực hành thêm logic ứng dụng.</p>
+<p>ADC hiện chưa có DMA, continuous/scan nhiều kênh, external timer trigger,
+injected conversion, differential hay analog watchdog. Kiểm thử PC không xác
+nhận được điện áp, thời gian lấy mẫu hay dạng sóng thực. Đối chiếu thanh ghi
+và trình tự trong <a href="https://www.st.com/resource/en/reference_manual/rm0364-stm32f334xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">ST RM0364</a>
+và chân/AF, giới hạn điện trong <a href="https://www.st.com/resource/en/datasheet/stm32f334r8.pdf">datasheet STM32F334R8</a>.</p><a class="back" href="#top">↑ Mục lục</a></main></body></html>

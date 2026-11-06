@@ -18,7 +18,10 @@
 #define GPIOF_BASEADDR (AHB2PERIPH_BASEADDR + 0x1400)
 //define ADC1_ADC2
 #define ADC1_BASEADDR (AHB3PERIPH_BASEADDR + 0x0000)
-#define ADC2_BASEADDR (AHB3PERIPH_BASEADDR + 0x03FF)
+#define ADC2_BASEADDR (AHB3PERIPH_BASEADDR + 0x0100)
+#define ADC12_COMMON_BASEADDR (AHB3PERIPH_BASEADDR + 0x0300)
+#define TIM2_BASEADDR (APB1PERIPH_BASEADDR + 0x0000)
+#define TIM3_BASEADDR (APB1PERIPH_BASEADDR + 0x0400)
 //define RCC_BASEADDR (AHB1PERIPH_BASEADDR + 0x1000)
 #define RCC_BASEADDR (AHB1PERIPH_BASEADDR + 0x1000)
 //define I2C
@@ -163,61 +166,95 @@ typedef struct
         volatile uint32_t IER;
         volatile uint32_t CR;
         volatile uint32_t CFGR;
+    uint32_t RESERVED0;
         volatile uint32_t SMPR1;
         volatile uint32_t SMPR2;
+    uint32_t RESERVED1;
         volatile uint32_t TR1;
         volatile uint32_t TR2;
         volatile uint32_t TR3;
+    uint32_t RESERVED2;
         volatile uint32_t SQR1;
         volatile uint32_t SQR2;
         volatile uint32_t SQR3;
         volatile uint32_t SQR4;
         volatile uint32_t DR;
+    uint32_t RESERVED3[2];
         volatile uint32_t JSQR;
+    uint32_t RESERVED4[4];
         volatile uint32_t OFR1;
         volatile uint32_t OFR2;
         volatile uint32_t OFR3;
         volatile uint32_t OFR4;
+    uint32_t RESERVED5[4];
         volatile uint32_t JDR1;
         volatile uint32_t JDR2;
         volatile uint32_t JDR3;
         volatile uint32_t JDR4;
+    uint32_t RESERVED6[4];
         volatile uint32_t AWD2CR;
         volatile uint32_t AWD3CR;
+    uint32_t RESERVED7[2];
         volatile uint32_t DIFSEL;
         volatile uint32_t CALFACT;
-        volatile uint32_t CCR;
-        volatile uint32_t CDR;
     }ADC_RegDef_t;
     #define ADC1 ((ADC_RegDef_t*)ADC1_BASEADDR)
     #define ADC2 ((ADC_RegDef_t*)ADC2_BASEADDR)
+typedef struct {
+    volatile uint32_t CSR;
+    uint32_t RESERVED;
+    volatile uint32_t CCR;
+    volatile uint32_t CDR;
+} ADC_Common_RegDef_t;
+#define ADC12_COMMON ((ADC_Common_RegDef_t *)ADC12_COMMON_BASEADDR)
+
+/* TIM2/TIM3 layout: TIM3 has reserved RCR/BDTR slots; never write them. */
+typedef struct {
+    volatile uint32_t CR1, CR2, SMCR, DIER, SR, EGR;
+    volatile uint32_t CCMR1, CCMR2, CCER, CNT, PSC, ARR;
+    uint32_t RESERVED_RCR;
+    volatile uint32_t CCR1, CCR2, CCR3, CCR4;
+    uint32_t RESERVED_BDTR;
+    volatile uint32_t DCR, DMAR;
+} TIM_RegDef_t;
+#define TIM2 ((TIM_RegDef_t *)TIM2_BASEADDR)
+#define TIM3 ((TIM_RegDef_t *)TIM3_BASEADDR)
 //define structure of CAN
 
+/* Register map dung chung cho handle CAN, giong GPIO/SPI/USART.
+ * TX/RX mailbox 16 byte; filter ID/MASK 8 byte. Offset theo RM0364. */
 typedef struct
-    {
-        volatile uint32_t MCR;
-        volatile uint32_t MSR;
-        volatile uint32_t TSR;
-        volatile uint32_t RF0R;
-        volatile uint32_t RF1R;
-        volatile uint32_t IER;
-        volatile uint32_t ESR;
-        volatile uint32_t BTR;
-        volatile uint32_t RESERVED0[88];
-        volatile uint32_t TI0R;
-        volatile uint32_t TDT0R;
-        volatile uint32_t TDL0R;
-        volatile uint32_t TDH0R;
-        volatile uint32_t TI1R;
-        volatile uint32_t TDT1R;
-        volatile uint32_t TDL1R;
-        volatile uint32_t TDH1R;
-        volatile uint32_t TI2R;
-        volatile uint32_t TDT2R;
-        volatile uint32_t TDL2R;
-        volatile uint32_t TDH2R;
-    }CAN_RegDef_t;
-    #define CAN1 ((CAN_RegDef_t*)CAN1_BASEADDR)
+{
+    volatile uint32_t ID;
+    volatile uint32_t LENGTH;
+    volatile uint32_t LOW;
+    volatile uint32_t HIGH;
+} CAN_Mailbox_RegDef_t;
+
+typedef struct
+{
+    volatile uint32_t ID;
+    volatile uint32_t MASK;
+} CAN_Filter_RegDef_t;
+
+typedef struct
+{
+    volatile uint32_t MCR, MSR, TSR, RF0R, RF1R, IER, ESR, BTR;
+    uint32_t RESERVED0[88];
+    CAN_Mailbox_RegDef_t TX[3];        /* 0x180 */
+    CAN_Mailbox_RegDef_t RX[2];        /* 0x1B0 */
+    uint32_t RESERVED1[12];
+    volatile uint32_t FMR, FM1R;       /* 0x200 */
+    uint32_t RESERVED2;
+    volatile uint32_t FS1R;
+    uint32_t RESERVED3;
+    volatile uint32_t FFA1R;
+    uint32_t RESERVED4;
+    volatile uint32_t FA1R;
+    uint32_t RESERVED5[8];
+    CAN_Filter_RegDef_t FILTER[14];    /* 0x240 */
+} CAN_RegDef_t;
+#define CAN1 ((CAN_RegDef_t*)CAN1_BASEADDR)
 //enable clock for gpio
 #define GPIOA_PCLK_EN() (RCC->AHBENR |= (1<<17))
 #define GPIOB_PCLK_EN() (RCC->AHBENR |= (1<<18))
@@ -247,11 +284,13 @@ typedef struct
 #define I2C1_PCLK_EN() (RCC->APB1ENR |= (1<<21))
 //disable clock for i2c
 #define I2C1_PCLK_DI() (RCC->APB1ENR &= ~(1<<21))
+#define I2C1_REG_RESET() do { RCC->APB1RSTR |= (1UL << 21); RCC->APB1RSTR &= ~(1UL << 21); } while (0)
 
 //enable clock for spi
 #define SPI1_PCLK_EN() (RCC->APB2ENR |= (1<<12))
 //disable clock for spi
 #define SPI1_PCLK_DI() (RCC->APB2ENR &= ~(1<<12))
+#define SPI1_REG_RESET() do { RCC->APB2RSTR |= (1UL << 12); RCC->APB2RSTR &= ~(1UL << 12); } while (0)
 
 //enable clock for usart
 #define USART1_PCLK_EN() (RCC->APB2ENR |= (1<<14))
@@ -261,6 +300,12 @@ typedef struct
 #define USART1_PCLK_DI() (RCC->APB2ENR &= ~(1<<14))
 #define USART2_PCLK_DI() (RCC->APB1ENR &= ~(1<<17))
 #define USART3_PCLK_DI() (RCC->APB1ENR &= ~(1<<18))
+#define USART2_REG_RESET() do { RCC->APB1RSTR |= (1UL << 17); RCC->APB1RSTR &= ~(1UL << 17); } while (0)
+
+//enable/disable clock and reset for CAN1
+#define CAN1_PCLK_EN() (RCC->APB1ENR |= (1UL << 25))
+#define CAN1_PCLK_DI() (RCC->APB1ENR &= ~(1UL << 25))
+#define CAN1_REG_RESET() do { RCC->APB1RSTR |= (1UL << 25); RCC->APB1RSTR &= ~(1UL << 25); } while (0)
 
 //enable clock for syscfg
 #define SYSCFG_PCLK_EN() (RCC->APB2ENR |= (1<<0))

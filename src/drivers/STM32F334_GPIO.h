@@ -64,6 +64,14 @@ typedef struct
 #define GPIO_AF5 5
 #define GPIO_AF6 6
 #define GPIO_AF7 7
+#define GPIO_AF8 8
+#define GPIO_AF9 9
+#define GPIO_AF10 10
+#define GPIO_AF11 11
+#define GPIO_AF12 12
+#define GPIO_AF13 13
+#define GPIO_AF14 14
+#define GPIO_AF15 15
 //
 
 
@@ -85,6 +93,7 @@ void GPIO_WriteToOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber, uint8_t Val
 void GPIO_WriteToOutputPort(GPIO_RegDef_t *pGPIOx, uint16_t Value);
 void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber);
 void GPIO_IRQConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t EnorDi);
+void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority);
 void GPIO_IRQHandling(uint8_t PinNumber);
 
 #endif /* INC_STM32F334GPIO_H_ */

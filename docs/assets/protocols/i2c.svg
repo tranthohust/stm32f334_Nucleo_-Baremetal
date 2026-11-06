@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="850" viewBox="0 0 940 850" role="img" aria-labelledby="i2c-title">
+<title id="i2c-title">I2C: ghi register rồi repeated START để đọc</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">I2C: ghi register rồi repeated START để đọc</text>
+<rect x="250" y="70" width="440" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">IDLE → LẤY TRANSACTION</text>
+<text x="470.0" y="122" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Descriptor chứa address, TX/RX, timeout</text>
+<polyline points="470,166 470,210" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,210 466.0853101929989,201.8959760788259 473.9146898070011,201.8959760788259" fill="#64748b"/>
+<rect x="250" y="210" width="440" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="234" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">WAIT_BUS</text>
+<text x="470.0" y="262" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Đợi bus rảnh, có thời hạn</text>
+<text x="470.0" y="285" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không làm kẹt main hoặc task</text>
+<polyline points="470,306 470,337 230,337 230,375" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="230,375 226.08531019299892,366.8959760788259 233.91468980700108,366.8959760788259" fill="#64748b"/>
+<rect x="30" y="375" width="400" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="230.0" y="399" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TX: WRITE REGISTER</text>
+<text x="230.0" y="427" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">START + address WRITE</text>
+<text x="230.0" y="450" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TXIS: gửi byte địa chỉ register</text>
+<rect x="510" y="375" width="400" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="710.0" y="399" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">RX: READ DATA</text>
+<text x="710.0" y="427" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">START + address READ</text>
+<text x="710.0" y="450" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE: lấy byte dữ liệu</text>
+<polyline points="430,423 510,423" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="510,423 501.8959760788259,426.9146898070011 501.8959760788259,419.0853101929989" fill="#64748b"/>
+<text x="710" y="346" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TC → repeated START, không STOP</text>
+<polyline points="710,471 710,518 470,518 470,555" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,555 466.0853101929989,546.8959760788259 473.9146898070011,546.8959760788259" fill="#64748b"/>
+<rect x="250" y="555" width="440" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="579" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">STOPF → DONE</text>
+<text x="470.0" y="607" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Phần cứng đã kết thúc transaction</text>
+<text x="470.0" y="630" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Process mới gọi callback về ứng dụng</text>
+<text x="470" y="714" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TX-only và RX-only cũng được hỗ trợ.</text>
+<text x="470" y="756" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">NACK / lỗi / timeout đi theo đường kết thúc hữu hạn; không chờ vô hạn.</text>
+<text x="470" y="793" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ACK/NACK byte cuối khác với ý nghĩa thành công của lệnh ứng dụng.</text>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="790" viewBox="0 0 940 790" role="img" aria-labelledby="timer-pwm-title">
+<title id="timer-pwm-title">Timer: bộ đếm cho periodic IRQ và PWM</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Timer: bộ đếm cho periodic IRQ và PWM</text>
+<rect x="185" y="80" width="570" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">BOARD: CLOCK TIMER = 8 MHz</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC chia clock; CNT đếm từ 0 tới ARR</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Update event nạp preload rồi bắt đầu chu kỳ mới</text>
+<polyline points="470,186 470,220 235,220 235,260" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,260 231.08531019299892,251.8959760788259 238.91468980700108,251.8959760788259" fill="#64748b"/>
+<polyline points="470,220 705,220 705,260" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,260 701.0853101929989,251.8959760788259 708.9146898070011,251.8959760788259" fill="#64748b"/>
+<rect x="35" y="260" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="235.0" y="284" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TIM3: PERIODIC IRQ</text>
+<text x="235.0" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC = 7999, ARR = 99</text>
+<text x="235.0" y="335" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">10 Hz → mỗi 100 ms có update</text>
+<rect x="505" y="260" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="705.0" y="284" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TIM2 CH1: PWM</text>
+<text x="705.0" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PSC = 7, ARR = 999</text>
+<text x="705.0" y="335" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">1 kHz; CCR1 chọn thời gian high</text>
+<polyline points="235,366 235,415" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,415 231.08531019299892,406.8959760788259 238.91468980700108,406.8959760788259" fill="#64748b"/>
+<polyline points="705,366 705,415" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,415 701.0853101929989,406.8959760788259 708.9146898070011,406.8959760788259" fill="#64748b"/>
+<rect x="35" y="415" width="400" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="235.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">UIF → TIM3_IRQHandler</text>
+<text x="235.0" y="467" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIM_IRQHandling đếm update</text>
+<text x="235.0" y="490" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIM_Process gọi callback ở task</text>
+<rect x="505" y="415" width="400" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="705.0" y="439" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">CNT &lt; CCR1 → HIGH</text>
+<text x="705.0" y="467" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM mode 1, active high</text>
+<text x="705.0" y="490" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">AF1 đưa TIM2_CH1 ra PA0</text>
+<polyline points="235,521 235,570" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,570 231.08531019299892,561.8959760788259 238.91468980700108,561.8959760788259" fill="#64748b"/>
+<polyline points="705,521 705,570" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,570 701.0853101929989,561.8959760788259 708.9146898070011,561.8959760788259" fill="#64748b"/>
+<rect x="35" y="570" width="400" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="235.0" y="594" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION</text>
+<text x="235.0" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">TIMER STATS xem số update</text>
+<text x="235.0" y="645" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR không in UART hay xử lý lệnh</text>
+<rect x="505" y="570" width="400" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="705.0" y="594" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION</text>
+<text x="705.0" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM 25 → CCR1 = 250</text>
+<text x="705.0" y="645" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">PWM START phát xung, không cần IRQ</text>
+<text x="470" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">SysTick vẫn tạo tick hệ thống; TIM3 và TIM2 là hai bộ timer độc lập.</text>
+</svg>

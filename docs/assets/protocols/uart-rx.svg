@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="850" viewBox="0 0 940 850" role="img" aria-labelledby="uart-rx-title">
+<title id="uart-rx-title">UART RX: hai cách nhận, một parser ứng dụng</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">UART RX: hai cách nhận, một parser ứng dụng</text>
+<rect x="260" y="70" width="420" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">PA3 → USART2 RDR</text>
+<text x="470.0" y="122" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Một byte đến từ đường UART</text>
+<polyline points="470,166 470,196 235,196 235,230" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="235,230 231.08531019299892,221.8959760788259 238.91468980700108,221.8959760788259" fill="#64748b"/>
+<polyline points="470,196 705,196 705,230" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,230 701.0853101929989,221.8959760788259 708.9146898070011,221.8959760788259" fill="#64748b"/>
+<rect x="35" y="230" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="235.0" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">CHỌN RX IRQ</text>
+<text x="235.0" y="282" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE → UART_IRQHandling</text>
+<text x="235.0" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR đọc byte từ RDR</text>
+<rect x="505" y="230" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="705.0" y="254" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">HOẶC RX DMA</text>
+<text x="705.0" y="282" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">DMA ghi vào buffer raw 256 byte</text>
+<text x="705.0" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">HT / TC / IDLE báo phần dữ liệu mới</text>
+<polyline points="705,326 705,370" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="705,370 701.0853101929989,361.8959760788259 708.9146898070011,361.8959760788259" fill="#64748b"/>
+<rect x="505" y="370" width="400" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="705.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">COLLECTOR TRONG ISR</text>
+<text x="705.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Copy phần mới từ raw buffer</text>
+<text x="705.0" y="445" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không đọc trùng phần đã lấy</text>
+<polyline points="235,326 235,502 470,502 470,530" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,530 466.0853101929989,521.8959760788259 473.9146898070011,521.8959760788259" fill="#64748b"/>
+<polyline points="705,466 705,502 470,502" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,502 478.1040239211741,498.0853101929989 478.1040239211741,505.9146898070011" fill="#64748b"/>
+<rect x="220" y="530" width="500" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="554" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">RX RING → UART_Read</text>
+<text x="470.0" y="582" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Main hoặc Comm task lấy byte từ ring</text>
+<text x="470.0" y="605" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chưa có ý nghĩa lệnh ở bước này</text>
+<polyline points="470,626 470,674" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,674 466.0853101929989,665.8959760788259 473.9146898070011,665.8959760788259" fill="#64748b"/>
+<rect x="220" y="674" width="500" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="698" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">PARSER → APPLICATION</text>
+<text x="470.0" y="726" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Ghép đến LF: LED ON, PING, ...</text>
+<text x="470.0" y="749" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Hiểu lệnh rồi thực hiện công việc</text>
+<text x="470" y="816" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RXNE và DMA là hai lựa chọn thay thế; không cùng tranh đọc RDR.</text>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="945" viewBox="0 0 940 945" role="img" aria-labelledby="adc-pwm-title">
+<title id="adc-pwm-title">ADC: điện áp → số → quyết định PWM</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC: điện áp → số → quyết định PWM</text>
+<rect x="100" y="80" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">1. PHẦN CỨNG NGOÀI</text>
+<text x="470.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Biến trở: hai đầu 3V3 / GND, con chạy → PA1</text>
+<text x="470.0" y="155" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO analog nối PA1 tới ADC1_IN2</text>
+<rect x="100" y="235" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="259" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">2. ADC_INIT</text>
+<text x="470.0" y="287" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC clock HCLK/2 = 4 MHz; bật regulator, calibration</text>
+<text x="470.0" y="310" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chọn sample time, kênh và regular sequence dài 1</text>
+<polyline points="470,186 470,235" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,235 466.0853101929989,226.8959760788259 473.9146898070011,226.8959760788259" fill="#64748b"/>
+<rect x="100" y="390" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="414" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">3. ADC READ → ADC_Start_IT</text>
+<text x="470.0" y="442" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADSTART bắt đầu lấy mẫu rồi chuyển đổi 12-bit</text>
+<text x="470.0" y="465" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Kết quả 0..4095 nằm trong DR; EOC báo có mẫu</text>
+<polyline points="470,341 470,390" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,390 466.0853101929989,381.8959760788259 473.9146898070011,381.8959760788259" fill="#64748b"/>
+<rect x="100" y="545" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="569" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">4. ADC1_2_IRQHandler</text>
+<text x="470.0" y="597" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC_IRQHandling đọc DR, cập nhật Value và Done</text>
+<text x="470.0" y="620" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Không tính mV, không in UART, không gọi callback</text>
+<polyline points="470,496 470,545" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,545 466.0853101929989,536.8959760788259 473.9146898070011,536.8959760788259" fill="#64748b"/>
+<rect x="100" y="700" width="740" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="724" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">5. MAIN / COMM TASK</text>
+<text x="470.0" y="752" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC_Process gọi adc_complete; application tính mV</text>
+<text x="470.0" y="775" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ADC PWM ON: đổi mẫu thành duty rồi cập nhật TIM2</text>
+<polyline points="470,651 470,700" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,700 466.0853101929989,691.8959760788259 473.9146898070011,691.8959760788259" fill="#64748b"/>
+<text x="470" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Mỗi ADC READ lấy một mẫu. Đây chưa phải vòng điều khiển chạy liên tục.</text>
+</svg>

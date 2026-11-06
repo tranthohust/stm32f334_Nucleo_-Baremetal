@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="770" viewBox="0 0 940 770" role="img" aria-labelledby="gpio-events-title">
+<title id="gpio-events-title">GPIO input: từ nút nhấn tới application</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO input: từ nút nhấn tới application</text>
+<rect x="100" y="85" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="109" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">1. NÚT NGOÀI → PB0</text>
+<text x="470.0" y="137" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nút nối PB0 xuống GND; pull-up nội giữ mức 1 khi nhả</text>
+<text x="470.0" y="160" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhấn = 0, nhả = 1; tiếp điểm có thể bị dội</text>
+<rect x="100" y="241" width="740" height="106" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="265" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">2. GPIO + SYSCFG + EXTI</text>
+<text x="470.0" y="293" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">MODER input, PUPDR pull-up, EXTICR chọn port B</text>
+<text x="470.0" y="316" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">RTSR / FTSR bắt hai cạnh; IMR cho phép báo ngắt</text>
+<polyline points="470,191 470,241" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,241 466.0853101929989,232.8959760788259 473.9146898070011,232.8959760788259" fill="#64748b"/>
+<rect x="100" y="397" width="740" height="106" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="470.0" y="421" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">3. EXTI0 IRQ → DRIVER</text>
+<text x="470.0" y="449" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">IO_Demo_GPIOIRQ → GPIO_IRQHandling(0)</text>
+<text x="470.0" y="472" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Xóa PR bằng W1C; chỉ đếm cạnh, không delay trong ISR</text>
+<polyline points="470,347 470,397" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,397 466.0853101929989,388.8959760788259 473.9146898070011,388.8959760788259" fill="#64748b"/>
+<rect x="100" y="553" width="740" height="106" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="470.0" y="577" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">4. MAIN / COMM TASK</text>
+<text x="470.0" y="605" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">IO_Demo_Process chờ 30 ms từ cạnh được quan sát cuối</text>
+<text x="470.0" y="628" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Xác nhận mức ổn định; đếm lần nhấn hoặc in UART</text>
+<polyline points="470,503 470,553" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,553 466.0853101929989,544.8959760788259 473.9146898070011,544.8959760788259" fill="#64748b"/>
+<text x="470" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">GPIO READ xem mức tức thời; GPIO WATCH ON xem sự kiện đã debounce.</text>
+</svg>

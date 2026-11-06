@@ -21,7 +21,8 @@
       "displayName": "STM32F334 Debug",
       "inherits": "stm32-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "FIRMWARE_USE_FREERTOS": false
       }
     },
     {
@@ -29,7 +30,24 @@
       "displayName": "STM32F334 Release",
       "inherits": "stm32-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "FIRMWARE_USE_FREERTOS": false
+      }
+    },
+    {
+      "name": "rtos-debug",
+      "displayName": "STM32F334 FreeRTOS Debug",
+      "inherits": "debug",
+      "cacheVariables": {
+        "FIRMWARE_USE_FREERTOS": true
+      }
+    },
+    {
+      "name": "rtos-release",
+      "displayName": "STM32F334 FreeRTOS Release",
+      "inherits": "release",
+      "cacheVariables": {
+        "FIRMWARE_USE_FREERTOS": true
       }
     }
   ],
@@ -41,6 +59,14 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "rtos-debug",
+      "configurePreset": "rtos-debug"
+    },
+    {
+      "name": "rtos-release",
+      "configurePreset": "rtos-release"
     }
   ]
 }

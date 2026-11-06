@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(Stm32f334NucleoBaremetal LANGUAGES C ASM)
+option(FIRMWARE_USE_FREERTOS "Build the static-allocation FreeRTOS learning demo" OFF)
 
 if(NOT CMAKE_CROSSCOMPILING OR NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
     message(FATAL_ERROR "Use the GNU Arm toolchain: cmake --preset debug")
@@ -16,6 +17,9 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 # Shared MCU options apply to the driver, application and startup assembly.
 add_library(stm32f334_options INTERFACE)
+target_compile_definitions(stm32f334_options INTERFACE
+    FIRMWARE_USE_FREERTOS=$<BOOL:${FIRMWARE_USE_FREERTOS}>
+)
 target_compile_options(stm32f334_options INTERFACE
     -mcpu=cortex-m4
     -mthumb
@@ -30,23 +34,60 @@ target_link_options(stm32f334_options INTERFACE
     -nostdlib
 )
 
-add_library(stm32f334_gpio STATIC
+add_library(stm32f334_drivers STATIC
     src/drivers/STM32F334.c
+    src/drivers/STM32F334_CORE.c
+    src/drivers/STM32F334_UART.c
+    src/drivers/STM32F334_SPI.c
+    src/drivers/STM32F334_CAN.c
+    src/drivers/STM32F334_I2C.c
+    src/drivers/STM32F334_TIM.c
+    src/drivers/STM32F334_ADC.c
     src/drivers/STM32F334.h
     src/drivers/STM32F334_GPIO.h
 )
-target_include_directories(stm32f334_gpio PUBLIC
+target_include_directories(stm32f334_drivers PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/drivers"
 )
-target_link_libraries(stm32f334_gpio PUBLIC stm32f334_options)
+target_link_libraries(stm32f334_drivers PUBLIC stm32f334_options)
+
+if(FIRMWARE_USE_FREERTOS)
+    # Pinned upstream files live in the repo: no configure-time network/heap.
+    add_library(freertos_kernel STATIC
+        third_party/FreeRTOS-Kernel/tasks.c
+        third_party/FreeRTOS-Kernel/queue.c
+        third_party/FreeRTOS-Kernel/list.c
+        third_party/FreeRTOS-Kernel/portable/GCC/ARM_CM3/port.c
+    )
+    target_include_directories(freertos_kernel PUBLIC
+        third_party/FreeRTOS-Kernel/include
+        third_party/FreeRTOS-Kernel/portable/GCC/ARM_CM3
+        src/rtos
+    )
+    target_link_libraries(freertos_kernel PUBLIC stm32f334_options)
+    target_link_libraries(stm32f334_drivers PUBLIC freertos_kernel)
+endif()
 
 add_executable(firmware
     src/test/main.c
+    src/app/communication_demo.c
+    src/app/io_demo.c
+    src/app/board_peripherals.c
+    src/app/interrupts.c
+    src/services/line_parser.c
     src/systerm/system_stm32f334.c
+    src/systerm/runtime.c
     src/startup/startup_stm32f334x8.s
 )
 set_target_properties(firmware PROPERTIES SUFFIX ".elf")
-target_link_libraries(firmware PRIVATE stm32f334_gpio gcc)
+if(FIRMWARE_USE_FREERTOS)
+    target_sources(firmware PRIVATE src/rtos/rtos_demo.c src/rtos/rtos_hooks.c)
+endif()
+set_source_files_properties(src/systerm/runtime.c PROPERTIES
+    COMPILE_OPTIONS "-fno-tree-loop-distribute-patterns"
+)
+target_include_directories(firmware PRIVATE src/app src/services)
+target_link_libraries(firmware PRIVATE stm32f334_drivers gcc)
 
 set(LINKER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/STM32F334R8_FLASH.ld")
 set(FIRMWARE_MAP "${CMAKE_CURRENT_BINARY_DIR}/firmware.map")

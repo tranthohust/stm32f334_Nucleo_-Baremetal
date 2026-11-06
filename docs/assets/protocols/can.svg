@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="810" viewBox="0 0 940 810" role="img" aria-labelledby="can-title">
+<title id="can-title">CAN: queue nguyên frame, hai đường RX và TX result</title>
+<rect width="100%" height="100%" fill="white"/>
+<text x="470.0" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN: queue nguyên frame, hai đường RX và TX result</text>
+<rect x="30" y="80" width="280" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="170.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION GỬI</text>
+<text x="170.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_Send copy frame</text>
+<rect x="630" y="80" width="280" height="96" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="770.0" y="104" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#2563eb">APPLICATION NHẬN</text>
+<text x="770.0" y="132" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_Receive đọc frame</text>
+<rect x="30" y="225" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="170.0" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">TX QUEUE</text>
+<text x="170.0" y="277" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Chờ mailbox trống</text>
+<rect x="630" y="225" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="770.0" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">RX QUEUE</text>
+<text x="770.0" y="277" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">ISR copy rồi release FIFO</text>
+<rect x="30" y="370" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="170.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">TX MAILBOX</text>
+<text x="170.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Giao frame cho hardware</text>
+<rect x="630" y="370" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="770.0" y="394" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">FILTER + RX FIFO</text>
+<text x="770.0" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Nhận frame được chọn</text>
+<rect x="330" y="515" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="539" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">bxCAN CONTROLLER</text>
+<text x="470.0" y="567" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Truyền và nhận frame</text>
+<rect x="330" y="665" width="280" height="96" rx="9" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+<text x="470.0" y="689" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#b45309">MẠCH NGOÀI</text>
+<text x="470.0" y="717" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Transceiver → CAN bus</text>
+<text x="470.0" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Demo dùng loopback nội bộ</text>
+<rect x="30" y="665" width="280" height="96" rx="9" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+<text x="170.0" y="689" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f766e">TX RESULT</text>
+<text x="170.0" y="717" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">CAN_GetTxResult</text>
+<text x="170.0" y="740" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#172b43">Biết OK hoặc lỗi của frame</text>
+<polyline points="170,176 170,225" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="170,225 166.08531019299892,216.8959760788259 173.91468980700108,216.8959760788259" fill="#64748b"/>
+<polyline points="770,225 770,176" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,176 773.9146898070011,184.1040239211741 766.0853101929989,184.1040239211741" fill="#64748b"/>
+<polyline points="170,321 170,370" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="170,370 166.08531019299892,361.8959760788259 173.91468980700108,361.8959760788259" fill="#64748b"/>
+<polyline points="770,370 770,321" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,321 773.9146898070011,329.1040239211741 766.0853101929989,329.1040239211741" fill="#64748b"/>
+<polyline points="170,466 170,563 330,563" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="330,563 321.8959760788259,566.9146898070011 321.8959760788259,559.0853101929989" fill="#64748b"/>
+<polyline points="610,563 770,563 770,466" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="770,466 773.9146898070011,474.1040239211741 766.0853101929989,474.1040239211741" fill="#64748b"/>
+<polyline points="470,611 470,665" fill="none" stroke="#64748b" stroke-width="1.5" />
+<polygon points="470,665 466.0853101929989,656.8959760788259 473.9146898070011,656.8959760788259" fill="#64748b"/>
+<polyline points="330,589 170,589 170,665" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 5" />
+<polygon points="170,665 166.08531019299892,656.8959760788259 173.91468980700108,656.8959760788259" fill="#64748b"/>
+<text x="174" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#64748b">RQCP / lỗi</text>
+</svg>
